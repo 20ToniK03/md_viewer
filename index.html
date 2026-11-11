@@ -62,15 +62,81 @@
   .dropbar .link { color: var(--accent); font-weight: 600; }
   .dropbar.drag { border-color: var(--accent); background: #eef4ff; }
 
-  .layout { display: grid; grid-template-columns: 260px minmax(0, 1fr); max-width: 1200px; margin: 0 auto; }
-  nav.toc {
+  .layout { display: grid; grid-template-columns: var(--toc-width, 260px) 6px minmax(0, 1fr); }
+  .toc-panel { grid-column: 1; grid-row: 1; }
+  .splitter { grid-column: 2; grid-row: 1; }
+  main.content { grid-column: 3; grid-row: 1; }
+  .layout.toc-collapsed { grid-template-columns: 0 0 minmax(0, 1fr); }
+  .layout.toc-collapsed .splitter { display: none; }
+  .layout.toc-collapsed .toc-panel { border-right: 0; }
+  .layout.toc-collapsed nav.toc { display: none; }
+  .layout.toc-collapsed .toc-head { justify-content: flex-start; padding-left: 0; }
+  .layout.toc-collapsed .toc-head-title { display: none; }
+  .layout.toc-collapsed .toc-toggle { border-color: var(--border); background: var(--bg); box-shadow: 0 2px 8px rgba(31, 35, 40, 0.12); }
+  .splitter {
+    cursor: col-resize;
+    background: var(--border);
+    border-radius: 2px;
+    transition: background .15s ease;
+  }
+  .splitter:hover, .splitter.dragging { background: var(--accent); }
+  body.dragging { user-select: none; cursor: col-resize; }
+
+  .toc-panel {
     position: sticky;
     top: 52px;
     align-self: start;
+    display: flex;
+    flex-direction: column;
     height: calc(100vh - 52px);
-    overflow-y: auto;
-    padding: 20px 16px 40px;
     border-right: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .toc-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex: 0 0 auto;
+    padding: 12px 10px 10px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc-head-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .toc-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+	margin: -7px 24px 0;
+    font: inherit;
+    font-size: 15px;
+    line-height: 1;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .toc-toggle:hover { color: var(--accent); background: #f0f6ff; border-color: var(--border); }
+  .toc-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  nav.toc {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 12px 16px 40px;
     font-size: 13px;
   }
   nav.toc a {
@@ -158,8 +224,19 @@
 
   @media (max-width: 820px) {
     .layout { grid-template-columns: 1fr; }
-    nav.toc { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--border); }
-    main.content { padding: 20px; }
+    .splitter { display: none; }
+    .toc-panel { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--border); }
+    nav.toc { min-height: 0; }
+    main.content { grid-column: 1; grid-row: 2; padding: 20px; }
+
+    /* на узком экране закрытое оглавление оставляет компактную панель с кнопкой */
+    .layout.toc-collapsed { grid-template-columns: 1fr; }
+    .layout.toc-collapsed .toc-head { justify-content: flex-start; gap: 10px; padding: 10px 12px 10px 16px; }
+    .layout.toc-collapsed .toc-head-title { display: block; }
+  }
+
+  @media (max-width: 560px) {
+    .topbar { padding: 10px 14px; }
   }
 </style>
 </head>
@@ -177,7 +254,16 @@
 </div>
 
 <div class="layout">
-  <nav class="toc" id="toc"></nav>
+  <aside class="toc-panel">
+    <div class="toc-head">
+      <span class="toc-head-title">Оглавление</span>
+      <button type="button" class="toc-toggle" id="toc-toggle" aria-controls="toc" aria-expanded="true" title="Скрыть оглавление">
+        <span class="icon" aria-hidden="true">«</span>
+      </button>
+    </div>
+    <nav class="toc" id="toc"></nav>
+  </aside>
+  <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" title="Перетащите, чтобы изменить ширину (можно закрыть оглавление полностью)"></div>
   <main class="content" id="content">
     <div class="empty">
       <div class="big">Отройте Markdown-файл, чтобы увидеть его оформленным</div>
@@ -214,6 +300,84 @@
   var toc = document.getElementById("toc");
   var overlay = document.getElementById("overlay");
   var dragDepth = 0;
+
+  var splitter = document.getElementById("splitter");
+  var layout = document.querySelector(".layout");
+  var tocToggle = document.getElementById("toc-toggle");
+  var draggingSplitter = false;
+
+  var DEFAULT_TOC_WIDTH = 260;
+  var MIN_OPEN_WIDTH = 160;
+  var SNAP_TO_ZERO = 60;
+  var MAX_TOC_WIDTH = 620;
+  var tocWidth = DEFAULT_TOC_WIDTH;
+  var lastOpenWidth = DEFAULT_TOC_WIDTH;
+
+  function applyTocWidth(width) {
+    width = Math.round(width);
+    width = Math.max(0, Math.min(MAX_TOC_WIDTH, width));
+    // «магнит»: чуть-чуть не дотянули до нуля - закрываем полностью,
+    // а слишком узкое, но не нулевое оглавление не оставляем
+    if (width > 0 && width < SNAP_TO_ZERO) {
+      width = 0;
+    } else if (width > 0 && width < MIN_OPEN_WIDTH) {
+      width = MIN_OPEN_WIDTH;
+    }
+    tocWidth = width;
+    layout.style.setProperty("--toc-width", width + "px");
+
+    var collapsed = width === 0;
+    layout.classList.toggle("toc-collapsed", collapsed);
+    toc.setAttribute("aria-hidden", collapsed ? "true" : "false");
+    if (!collapsed) {
+      lastOpenWidth = width;
+    }
+    updateTocToggle(collapsed);
+  }
+
+  function updateTocToggle(collapsed) {
+    tocToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    var text = collapsed ? "Показать оглавление" : "Скрыть оглавление";
+    tocToggle.title = text;
+    tocToggle.setAttribute("aria-label", text);
+    tocToggle.querySelector(".icon").textContent = collapsed ? "☰" : "«";
+  }
+
+  function toggleToc() {
+    if (tocWidth === 0) {
+      applyTocWidth(lastOpenWidth || DEFAULT_TOC_WIDTH);
+    } else {
+      applyTocWidth(0);
+    }
+  }
+
+  tocToggle.addEventListener("click", toggleToc);
+
+  splitter.addEventListener("pointerdown", function (e) {
+    e.preventDefault();
+    draggingSplitter = true;
+    splitter.classList.add("dragging");
+    document.body.classList.add("dragging");
+  });
+
+  window.addEventListener("pointermove", function (e) {
+    if (!draggingSplitter) {
+      return;
+    }
+    var width = e.clientX - layout.getBoundingClientRect().left;
+    applyTocWidth(width);
+  });
+
+  window.addEventListener("pointerup", function () {
+    if (!draggingSplitter) {
+      return;
+    }
+    draggingSplitter = false;
+    splitter.classList.remove("dragging");
+    document.body.classList.remove("dragging");
+  });
+
+  applyTocWidth(DEFAULT_TOC_WIDTH);
 
   // --- клик по панели открывает диалог выбора файла ---
   dropbar.addEventListener("click", function () {
