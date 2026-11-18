@@ -188,6 +188,27 @@
   }
   pre code { background: transparent; padding: 0; font-size: 0.85em; }
 
+  .code-block { position: relative; margin: 14px 0; }
+  .code-block pre { margin: 0; }
+  .code-block .code-copy {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 3px 10px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .code-block:hover .code-copy { opacity: 1; }
+  .code-block .code-copy:hover { color: var(--accent); border-color: var(--accent); }
+
   table { border-collapse: collapse; width: 100%; margin: 14px 0; display: block; overflow-x: auto; }
   th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
   th { background: var(--head-bg); font-weight: 600; }
@@ -278,8 +299,9 @@
   .mermaid-toolbar .sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
   .mermaid-viewport { overflow: auto; max-height: 80vh; cursor: grab; }
   .mermaid-viewport.panning { cursor: grabbing; }
-  .mermaid-inner { display: inline-block; padding: 10px; transform-origin: 0 0; }
+  .mermaid-inner { display: inline-block; padding: 10px; transform-origin: 0 0; line-height: normal; font-family: "trebuchet ms", verdana, arial, sans-serif; }
   .mermaid-inner svg { display: block; height: auto; }
+  .mermaid-inner, .mermaid-inner * { line-height: normal; }
   .mermaid-box:fullscreen {
     display: flex;
     flex-direction: column;
@@ -558,6 +580,7 @@
     toc.innerHTML = items.join("");
 
     renderMermaid();
+    addCodeCopyButtons();
   }
 
   var mermaidInitialized = false;
@@ -610,6 +633,28 @@
       note.className = "mermaid-error";
       note.textContent = "Mermaid не загрузился (нет интернета?). Ниже - исходный код диаграммы.";
       code.parentNode.insertAdjacentElement("beforebegin", note);
+    });
+  }
+
+  function addCodeCopyButtons() {
+    var pres = content.querySelectorAll("pre");
+    Array.prototype.forEach.call(pres, function (pre) {
+      var code = pre.querySelector("code");
+      if (!code) { return; }
+      if (code.className && code.className.indexOf("language-mermaid") !== -1) { return; }
+      var wrapper = document.createElement("div");
+      wrapper.className = "code-block";
+      pre.parentNode.insertBefore(wrapper, pre);
+      wrapper.appendChild(pre);
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "code-copy";
+      btn.textContent = "Копировать";
+      btn.title = "Копировать код";
+      wrapper.appendChild(btn);
+      btn.addEventListener("click", function () {
+        copyText(code.textContent, "Код скопирован в буфер");
+      });
     });
   }
 
