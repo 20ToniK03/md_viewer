@@ -601,7 +601,16 @@
       return;
     }
     if (!mermaidInitialized) {
-      mermaid.initialize({ startOnLoad: false, theme: "default" });
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: "default",
+        flowchart: {
+          nodeSpacing: 60,
+          rankSpacing: 60,
+          padding: 12,
+          subGraphTitleMargin: { top: 25, bottom: 10 }
+        }
+      });
       mermaidInitialized = true;
     }
     var idx = 0;
