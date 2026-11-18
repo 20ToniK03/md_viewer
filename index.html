@@ -299,9 +299,8 @@
   .mermaid-toolbar .sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
   .mermaid-viewport { overflow: auto; max-height: 80vh; cursor: grab; }
   .mermaid-viewport.panning { cursor: grabbing; }
-  .mermaid-inner { display: inline-block; padding: 10px; transform-origin: 0 0; line-height: normal; font-family: "trebuchet ms", verdana, arial, sans-serif; }
+  .mermaid-inner { display: inline-block; padding: 10px; transform-origin: 0 0; }
   .mermaid-inner svg { display: block; height: auto; }
-  .mermaid-inner, .mermaid-inner * { line-height: normal; }
   .mermaid-box:fullscreen {
     display: flex;
     flex-direction: column;
@@ -608,7 +607,7 @@
           nodeSpacing: 60,
           rankSpacing: 60,
           padding: 12,
-          subGraphTitleMargin: { top: 25, bottom: 10 }
+          subGraphTitleMargin: { top: 80, bottom: 10 }
         }
       });
       mermaidInitialized = true;
