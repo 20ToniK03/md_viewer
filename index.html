@@ -610,7 +610,7 @@
       var source = code.textContent;
       var id = "mmd-" + (++idx) + "-" + Date.now().toString(36);
       Promise.resolve(mermaid.render(id, source)).then(function (result) {
-        var box = buildMermaidBox(result.svg);
+        var box = buildMermaidBox(result.svg, source);
         if (pre.parentNode) {
           pre.parentNode.replaceChild(box, pre);
         }
@@ -658,10 +658,11 @@
     });
   }
 
-  function buildMermaidBox(svg) {
+  function buildMermaidBox(svg, source) {
     var box = document.createElement("div");
     box.className = "mermaid-box";
     box._scale = 1;
+    box._mermaidSource = source || "";
     box.innerHTML =
       '<div class="mermaid-toolbar">' +
         '<button type="button" data-act="zoom-in" title="Приблизить">+</button>' +
@@ -672,6 +673,7 @@
         '<span class="sep"></span>' +
         '<button type="button" data-act="copy-png" title="Копировать PNG">PNG</button>' +
         '<button type="button" data-act="copy-svg" title="Копировать SVG">SVG</button>' +
+        '<button type="button" data-act="copy-mmd" title="Копировать код Mermaid">Mermaid</button>' +
       '</div>' +
       '<div class="mermaid-viewport"><div class="mermaid-inner">' + svg + '</div></div>';
     box.querySelector(".mermaid-toolbar").addEventListener("click", function (e) {
@@ -744,6 +746,8 @@
       });
     } else if (act === "copy-svg") {
       copyText(new XMLSerializer().serializeToString(box.querySelector("svg")), "SVG скопирован в буфер");
+    } else if (act === "copy-mmd") {
+      copyText(box._mermaidSource || "", "Код Mermaid скопирован в буфер");
     }
   }
 
