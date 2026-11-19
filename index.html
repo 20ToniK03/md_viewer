@@ -227,29 +227,6 @@
   }
   .sp-reset:hover { color: var(--accent); border-color: var(--accent); }
 
-  /* ---------- зона загрузки ---------- */
-  .dropbar {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin: 16px 18px 0;
-    padding: 12px 16px;
-    border: 2px dashed var(--border);
-    border-radius: 12px;
-    background: var(--panel);
-    color: var(--muted);
-    font-size: 13.5px;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color .15s ease, background .15s ease;
-  }
-  .dropbar:hover { border-color: var(--accent); background: var(--accent-soft); }
-  .dropbar .link { color: var(--accent); font-weight: 700; }
-  .dropbar.drag { border-color: var(--accent); background: var(--accent-soft); }
-  .dropbar.hidden { display: none; }
-
   /* ---------- каркас ---------- */
   .layout {
     display: grid;
@@ -685,12 +662,6 @@
   </div>
 </header>
 
-<div class="dropbar" id="dropbar" role="button" tabindex="0">
-  <span>Перетащите <b>.md</b> файл в окно</span>
-  <span>или</span>
-  <span class="link">нажмите сюда, чтобы выбрать файл</span>
-</div>
-
 <div class="layout" id="layout">
   <aside class="toc-panel">
     <div class="toc-head">
@@ -706,8 +677,8 @@
     <div class="empty">
       <div class="big">Откройте Markdown-файл, чтобы увидеть его оформленным</div>
       <ul>
-        <li>перетащите файл прямо на страницу;</li>
-        <li>или нажмите «Открыть файл» вверху.</li>
+        <li>перетащите файл прямо на страницу</li>
+        <li>или нажмите на иконку папки вверху</li>
       </ul>
     </div>
   </main>
@@ -800,7 +771,6 @@
   }
 
   var fileInput = document.getElementById("file-input");
-  var dropbar = document.getElementById("dropbar");
   var fileName = document.getElementById("file-name");
   var content = document.getElementById("content");
   var toc = document.getElementById("toc");
@@ -1052,10 +1022,6 @@
   applyTocWidth(savedToc > 0 ? savedToc : DEFAULT_TOC_WIDTH);
 
   /* ---------- файл ---------- */
-  dropbar.addEventListener("click", function () { fileInput.click(); });
-  dropbar.addEventListener("keydown", function (e) {
-    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); }
-  });
   fileInput.addEventListener("change", function () {
     handleFiles(fileInput.files);
     fileInput.value = "";
@@ -1065,7 +1031,6 @@
     e.preventDefault();
     dragDepth++;
     overlay.classList.add("visible");
-    dropbar.classList.add("drag");
   });
   window.addEventListener("dragover", function (e) { e.preventDefault(); });
   window.addEventListener("dragleave", function (e) {
@@ -1074,14 +1039,12 @@
     if (dragDepth <= 0) {
       dragDepth = 0;
       overlay.classList.remove("visible");
-      dropbar.classList.remove("drag");
     }
   });
   window.addEventListener("drop", function (e) {
     e.preventDefault();
     dragDepth = 0;
     overlay.classList.remove("visible");
-    dropbar.classList.remove("drag");
     if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
       handleFiles(e.dataTransfer.files);
     }
@@ -1106,7 +1069,6 @@
   /* ---------- рендер markdown ---------- */
   function render(text) {
     content.innerHTML = marked.parse(text);
-    dropbar.classList.add("hidden");
     openBtn.innerHTML = ICONS.openActive;
     buildToc();
     renderMermaidBlocks();
