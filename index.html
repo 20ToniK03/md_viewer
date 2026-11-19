@@ -4,107 +4,289 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Markdown Viewer</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js" defer></script>
 <style>
   :root {
+    --font-size: 16px;
+    --top-h: 54px;
+    --toc-width: 280px;
+    --content-max: 1220px;
+    --radius: 10px;
+  }
+
+  /* ---------- палитры (значения по умолчанию = GitHub; остальные ставит JS) ---------- */
+  :root {
     --bg: #ffffff;
+    --panel: #ffffff;
+    --panel-2: #f6f8fa;
     --fg: #1f2328;
     --muted: #59636e;
     --border: #d1d9e0;
-    --code-bg: #f6f8fa;
     --accent: #0969da;
+    --accent-2: #218bff;
+    --accent-soft: #ddf4ff;
+    --code-bg: #f6f8fa;
     --head-bg: #f6f8fa;
-    --overlay: rgba(9, 105, 218, 0.08);
+    --top-bg: #24292f;
+    --top-fg: #ffffff;
+    --grid: #d7dee8;
+    --shadow: 0 10px 30px rgba(31, 35, 40, .12);
+    --shadow-sm: 0 2px 8px rgba(31, 35, 40, .10);
+    --tip-bg: #1f2328;
+    --tip-fg: #ffffff;
+    --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+    --font-head: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
   }
+
   * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  html, body { min-height: 100%; }
   body {
     margin: 0;
     color: var(--fg);
     background: var(--bg);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
-    font-size: 16px;
-    line-height: 1.6;
+    font-family: var(--font-body);
+    font-size: var(--font-size);
+    line-height: 1.62;
+    transition: background .18s ease, color .18s ease;
   }
 
+  /* ---------- кастомный скроллбар (основной и вложенные) ---------- */
+  * { scrollbar-width: thin; scrollbar-color: var(--accent) transparent; }
+  ::-webkit-scrollbar { width: 11px; height: 11px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--muted) 42%, transparent);
+    border-radius: 8px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-corner { background: transparent; }
+
+  /* ---------- верхняя панель ---------- */
   .topbar {
     position: sticky;
     top: 0;
-    z-index: 5;
+    z-index: 30;
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 24px;
-    background: #24292f;
-    color: #fff;
+    height: var(--top-h);
+    padding: 0 18px;
+    background: var(--top-bg);
+    color: var(--top-fg);
     border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
   }
-  .topbar .dot { width: 10px; height: 10px; border-radius: 50%; background: #2da44e; }
-  .topbar .title { font-weight: 600; font-size: 15px; white-space: nowrap; }
-  .topbar .sub { color: #9da7b0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+    flex: 0 0 auto;
+  }
+  .topbar .title { font-weight: 700; font-size: 15px; white-space: nowrap; letter-spacing: .01em; }
+  .topbar .sub {
+    color: color-mix(in srgb, var(--top-fg) 70%, transparent);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .top-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+  .tb-btn {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--top-fg);
+    background: color-mix(in srgb, var(--top-fg) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--top-fg) 24%, transparent);
+    border-radius: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background .15s ease, border-color .15s ease, transform .1s ease;
+  }
+  .tb-btn:hover { background: color-mix(in srgb, var(--top-fg) 18%, transparent); border-color: color-mix(in srgb, var(--top-fg) 40%, transparent); }
+  .tb-btn:active { transform: translateY(1px); }
+  .tb-btn.icon { padding: 7px 10px; }
 
+  /* ---------- панель настроек ---------- */
+  .menu-wrap { position: relative; }
+  .settings-pop {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 60;
+    width: 332px;
+    max-width: calc(100vw - 24px);
+    background: var(--panel);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    display: none;
+    overflow: hidden;
+  }
+  .settings-pop.open { display: block; animation: pop .12s ease-out; }
+  @keyframes pop { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .sp-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-2);
+    font-size: 13px;
+  }
+  .sp-head button {
+    border: 0;
+    background: none;
+    color: var(--muted);
+    font-size: 19px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+    border-radius: 4px;
+  }
+  .sp-head button:hover { color: var(--fg); background: var(--accent-soft); }
+  .sp-body { padding: 12px 14px 14px; max-height: 70vh; overflow-y: auto; }
+  .sp-group { margin-bottom: 15px; }
+  .sp-group:last-child { margin-bottom: 0; }
+  .sp-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 7px;
+  }
+  .theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .theme-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 9px;
+    font: inherit;
+    font-size: 12.5px;
+    color: var(--fg);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color .15s ease, background .15s ease;
+  }
+  .theme-btn:hover { border-color: var(--accent); }
+  .theme-btn[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+  .theme-btn .sw {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    flex: 0 0 auto;
+  }
+  .theme-btn .sw { border-color: var(--accent); }
+  .theme-btn > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  select, input[type="range"] { width: 100%; font: inherit; }
+  select {
+    color: var(--fg);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 9px;
+    font-size: 13px;
+  }
+  input[type="range"] { accent-color: var(--accent); }
+  .range-row { display: flex; align-items: center; gap: 10px; }
+  .range-row output { min-width: 46px; text-align: right; font-size: 12.5px; color: var(--muted); }
+  .sp-check { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; line-height: 1.4; cursor: pointer; }
+  .sp-check input { accent-color: var(--accent); margin-top: 2px; }
+  .sp-reset {
+    width: 100%;
+    margin-top: 4px;
+    padding: 8px 10px;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--muted);
+    background: transparent;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .sp-reset:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* ---------- зона загрузки ---------- */
   .dropbar {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
     flex-wrap: wrap;
-    margin: 18px 24px 0;
-    padding: 14px 18px;
+    margin: 16px 18px 0;
+    padding: 12px 16px;
     border: 2px dashed var(--border);
     border-radius: 12px;
-    background: #fafbfc;
+    background: var(--panel);
     color: var(--muted);
-    font-size: 14px;
+    font-size: 13.5px;
     text-align: center;
     cursor: pointer;
     transition: border-color .15s ease, background .15s ease;
   }
-  .dropbar:hover { border-color: var(--accent); background: #f0f6ff; }
-  .dropbar .link { color: var(--accent); font-weight: 600; }
-  .dropbar.drag { border-color: var(--accent); background: #eef4ff; }
+  .dropbar:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .dropbar .link { color: var(--accent); font-weight: 700; }
+  .dropbar.drag { border-color: var(--accent); background: var(--accent-soft); }
+  .dropbar.hidden { display: none; }
 
-  .layout { display: grid; grid-template-columns: var(--toc-width, 260px) 6px minmax(0, 1fr); }
+  /* ---------- каркас ---------- */
+  .layout {
+    display: grid;
+    grid-template-columns: var(--toc-width) 6px minmax(0, 1fr);
+    align-items: start;
+    padding-top: 14px;
+  }
+  /* жёсткая привязка к колонкам, чтобы при скрытии панели контент не сползал в колонку 1 */
   .toc-panel { grid-column: 1; grid-row: 1; }
   .splitter { grid-column: 2; grid-row: 1; }
   main.content { grid-column: 3; grid-row: 1; }
   .layout.toc-collapsed { grid-template-columns: 0 0 minmax(0, 1fr); }
   .layout.toc-collapsed .splitter { display: none; }
-  .layout.toc-collapsed .toc-panel { border-right: 0; }
-  .layout.toc-collapsed nav.toc { display: none; }
-  .layout.toc-collapsed .toc-head { justify-content: flex-start; padding-left: 0; }
-  .layout.toc-collapsed .toc-head-title { display: none; }
-  .layout.toc-collapsed .toc-toggle { border-color: var(--border); background: var(--bg); box-shadow: 0 2px 8px rgba(31, 35, 40, 0.12); }
-  .splitter {
-    cursor: col-resize;
-    background: var(--border);
-    border-radius: 2px;
-    transition: background .15s ease;
-  }
-  .splitter:hover, .splitter.dragging { background: var(--accent); }
-  body.dragging { user-select: none; cursor: col-resize; }
+  .layout.toc-collapsed .toc-panel { display: none; }
 
   .toc-panel {
     position: sticky;
-    top: 52px;
-    align-self: start;
+    top: calc(var(--top-h) + 14px);
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 52px);
-    border-right: 1px solid var(--border);
-    background: var(--bg);
+    max-height: calc(100vh - var(--top-h) - 14px);
+    border: 1px solid var(--border);
+    border-left: 0;
+    border-radius: 0 12px 12px 0;
+    background: var(--panel);
+    overflow: hidden;
   }
   .toc-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    flex: 0 0 auto;
-    padding: 12px 10px 10px 16px;
+    padding: 10px 8px 10px 14px;
     border-bottom: 1px solid var(--border);
+    background: var(--panel-2);
   }
   .toc-head-title {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.06em;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: .08em;
     text-transform: uppercase;
     color: var(--muted);
     white-space: nowrap;
@@ -115,11 +297,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    flex: 0 0 auto;
     width: 26px;
     height: 26px;
     padding: 0;
-	margin: -7px 24px 0;
     font: inherit;
     font-size: 15px;
     line-height: 1;
@@ -128,15 +308,14 @@
     border: 1px solid transparent;
     border-radius: 6px;
     cursor: pointer;
-    transition: background .15s ease, color .15s ease, border-color .15s ease;
   }
-  .toc-toggle:hover { color: var(--accent); background: #f0f6ff; border-color: var(--border); }
+  .toc-toggle:hover { color: var(--accent); background: var(--accent-soft); border-color: var(--border); }
   .toc-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   nav.toc {
     flex: 1 1 auto;
     overflow-y: auto;
-    padding: 12px 16px 40px;
+    padding: 10px 10px 30px;
     font-size: 13px;
   }
   nav.toc a {
@@ -146,27 +325,53 @@
     text-decoration: none;
     border-radius: 6px;
     border-left: 3px solid transparent;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  nav.toc a:hover { color: var(--accent); background: #f0f6ff; }
-  nav.toc a.lvl-1 { font-weight: 600; color: var(--fg); margin-top: 10px; }
-  nav.toc a.lvl-2 { padding-left: 20px; }
-  nav.toc a.lvl-3 { padding-left: 34px; }
+  nav.toc a:hover { color: var(--accent); background: var(--accent-soft); }
+  nav.toc a.lvl-1 { font-weight: 700; color: var(--fg); margin-top: 9px; }
+  nav.toc a.lvl-2 { padding-left: 18px; }
+  nav.toc a.lvl-3 { padding-left: 30px; font-size: 12px; }
 
-  main.content { padding: 24px 40px 80px; min-width: 0; }
+  .splitter {
+    position: sticky;
+    top: calc(var(--top-h) + 14px);
+    height: calc(100vh - var(--top-h) - 14px);
+    cursor: col-resize;
+    background: transparent;
+    transition: background .15s ease;
+  }
+  .splitter::after {
+    content: "";
+    position: absolute;
+    left: 2px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--border);
+    border-radius: 2px;
+  }
+  .splitter:hover::after, .splitter.dragging::after { background: var(--accent); }
+  body.dragging { user-select: none; cursor: col-resize; }
+
+  main.content {
+    width: 100%;
+    max-width: var(--content-max);
+    margin: 0 auto;
+    padding: 4px 34px 90px;
+    min-width: 0;
+  }
   main.content > h1:first-child { margin-top: 0; }
 
-  .empty {
-    margin-top: 48px;
-    text-align: center;
-    color: var(--muted);
-  }
-  .empty .big { font-size: 20px; color: var(--fg); font-weight: 600; }
+  .empty { margin-top: 46px; text-align: center; color: var(--muted); }
+  .empty .big { font-size: 21px; color: var(--fg); font-weight: 700; }
   .empty ul { list-style: none; padding: 0; display: inline-block; text-align: left; color: var(--muted); }
 
-  h1, h2, h3, h4 { line-height: 1.25; scroll-margin-top: 70px; }
-  h1 { font-size: 1.9em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; }
-  h2 { font-size: 1.4em; border-bottom: 1px solid var(--border); padding-bottom: 0.3em; margin-top: 1.6em; }
-  h3 { font-size: 1.15em; margin-top: 1.4em; }
+  h1, h2, h3, h4 { line-height: 1.25; scroll-margin-top: calc(var(--top-h) + 16px); overflow-wrap: anywhere; font-family: var(--font-head, var(--font-body)); }
+  h1 { font-size: 1.85em; border-bottom: 1px solid var(--border); padding-bottom: .3em; }
+  h2 { font-size: 1.36em; border-bottom: 1px solid var(--border); padding-bottom: .3em; margin-top: 1.6em; }
+  h3 { font-size: 1.14em; margin-top: 1.4em; }
   h4 { font-size: 1em; }
 
   a { color: var(--accent); text-decoration: none; }
@@ -174,19 +379,22 @@
 
   code {
     font-family: ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, "Courier New", monospace;
-    font-size: 0.9em;
+    font-size: .88em;
     background: var(--code-bg);
-    padding: 0.15em 0.4em;
+    padding: .15em .38em;
     border-radius: 6px;
+    overflow-wrap: anywhere;
   }
   pre {
     background: var(--code-bg);
-    padding: 18px 22px;
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    padding: 16px 18px;
+    border-radius: 10px;
     overflow-x: auto;
     line-height: 1.5;
   }
-  pre code { background: transparent; padding: 0; font-size: 0.85em; }
+  pre code { background: transparent; padding: 0; font-size: .84em; }
+  body.wrap-code pre code { white-space: pre-wrap; overflow-wrap: anywhere; }
 
   .code-block { position: relative; margin: 14px 0; }
   .code-block pre { margin: 0; }
@@ -199,7 +407,7 @@
     font-size: 12px;
     font-weight: 600;
     color: var(--muted);
-    background: #fff;
+    background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 6px;
     cursor: pointer;
@@ -210,21 +418,21 @@
   .code-block .code-copy:hover { color: var(--accent); border-color: var(--accent); }
 
   table { border-collapse: collapse; width: 100%; margin: 14px 0; display: block; overflow-x: auto; }
-  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; }
-  th { background: var(--head-bg); font-weight: 600; }
-  tr:nth-child(2n) td { background: #fafbfc; }
+  th, td { border: 1px solid var(--border); padding: 8px 12px; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+  th { background: var(--head-bg); font-weight: 700; }
+  tbody tr:nth-child(2n) td { background: color-mix(in srgb, var(--panel-2) 70%, transparent); }
 
   blockquote {
     margin: 14px 0;
     padding: 2px 16px;
-    border-left: 4px solid var(--border);
+    border-left: 4px solid var(--accent);
     color: var(--muted);
-    background: #fafbfc;
-    border-radius: 0 6px 6px 0;
+    background: var(--panel-2);
+    border-radius: 0 8px 8px 0;
   }
-
   hr { border: 0; border-top: 1px solid var(--border); margin: 28px 0; }
   ul, ol { padding-left: 1.6em; }
+  img { max-width: 100%; height: auto; }
 
   .overlay {
     position: fixed;
@@ -233,41 +441,24 @@
     display: none;
     align-items: center;
     justify-content: center;
-    background: var(--overlay);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
     border: 4px dashed var(--accent);
-    border-radius: 0;
     color: var(--accent);
     font-size: 28px;
-    font-weight: 700;
+    font-weight: 800;
     pointer-events: none;
   }
   .overlay.visible { display: flex; }
 
-  @media (max-width: 820px) {
-    .layout { grid-template-columns: 1fr; }
-    .splitter { display: none; }
-    .toc-panel { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--border); }
-    nav.toc { min-height: 0; }
-    main.content { grid-column: 1; grid-row: 2; padding: 20px; }
-
-    /* на узком экране закрытое оглавление оставляет компактную панель с кнопкой */
-    .layout.toc-collapsed { grid-template-columns: 1fr; }
-    .layout.toc-collapsed .toc-head { justify-content: flex-start; gap: 10px; padding: 10px 12px 10px 16px; }
-    .layout.toc-collapsed .toc-head-title { display: block; }
-  }
-
-  @media (max-width: 560px) {
-    .topbar { padding: 10px 14px; }
-  }
-
-  /* --- Mermaid --- */
+  /* ---------- mermaid ---------- */
   .mermaid-box {
     position: relative;
-    margin: 14px 0;
-    background: #fff;
+    margin: 16px 0;
+    background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 12px;
     overflow: hidden;
+    box-shadow: var(--shadow-sm);
   }
   .mermaid-toolbar {
     display: flex;
@@ -275,32 +466,48 @@
     gap: 4px;
     padding: 6px 8px;
     border-bottom: 1px solid var(--border);
-    background: #f6f8fa;
+    background: var(--panel-2);
+    flex-wrap: wrap;
   }
   .mermaid-toolbar button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 26px;
-    height: 26px;
-    padding: 0 7px;
+    min-width: 28px;
+    height: 28px;
+    padding: 0 8px;
     font: inherit;
     font-size: 12px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--fg);
-    background: #fff;
+    background: var(--panel);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 7px;
     cursor: pointer;
     transition: background .12s ease, border-color .12s ease, color .12s ease;
   }
-  .mermaid-toolbar button:hover { background: #f0f6ff; border-color: var(--accent); color: var(--accent); }
-  .mermaid-toolbar button.scale { min-width: 52px; }
+  .mermaid-toolbar button:hover { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+  .mermaid-toolbar button.pct { min-width: 56px; }
   .mermaid-toolbar .sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
-  .mermaid-viewport { overflow: auto; max-height: 80vh; cursor: grab; }
+  .mermaid-toolbar .hint { margin-left: auto; font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .mermaid-viewport {
+    position: relative;
+    display: flex;
+    height: 380px;
+    overflow: auto;
+    cursor: grab;
+    background-color: var(--panel);
+    background-image: radial-gradient(circle, var(--grid) 1px, transparent 1px);
+    background-size: 20px 20px;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    scroll-behavior: auto;
+  }
+  .mermaid-viewport::-webkit-scrollbar { display: none; width: 0; height: 0; }
   .mermaid-viewport.panning { cursor: grabbing; }
-  .mermaid-inner { display: inline-block; padding: 10px; transform-origin: 0 0; }
-  .mermaid-inner svg { display: block; height: auto; }
+  .mermaid-inner { margin: auto; padding: 16px; transform-origin: center center; }
+  .mermaid-inner svg { display: block; max-width: none !important; height: auto; }
   .mermaid-box:fullscreen {
     display: flex;
     flex-direction: column;
@@ -310,44 +517,169 @@
     border: 0;
     border-radius: 0;
   }
-  .mermaid-box:fullscreen .mermaid-viewport { flex: 1 1 auto; max-height: none; }
-  .mermaid-box:fullscreen .mermaid-inner { background: #fff; }
-  .mermaid-toast {
+  .mermaid-box:fullscreen .mermaid-viewport { flex: 1 1 auto; height: auto !important; }
+  .mermaid-box:fullscreen .mermaid-inner { background: transparent; }
+
+  /* ограничение подписей узлов: не даём тексту вылезать за блок */
+  .mermaid-inner .nodeLabel,
+  .mermaid-inner .nodeLabel p {
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word;
+    text-align: center;
+    line-height: 1.3 !important;
+    margin: 0 !important;
+  }
+  .mermaid-inner .nodeLabel {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden !important;
+    max-width: 210px;
+    max-height: 5.4em;
+    padding: 0 2px;
+  }
+  .mermaid-inner .edgeLabel,
+  .mermaid-inner .edgeLabel span,
+  .mermaid-inner .edgeLabel div {
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    max-width: 230px;
+  }
+
+  .mermaid-toast, .toast {
     position: fixed;
     left: 50%;
-    bottom: 26px;
-    transform: translateX(-50%);
-    z-index: 60;
-    background: #24292f;
-    color: #fff;
-    padding: 8px 14px;
-    border-radius: 8px;
+    bottom: 24px;
+    transform: translateX(-50%) translateY(8px);
+    z-index: 90;
+    background: var(--tip-bg);
+    color: var(--tip-fg);
+    padding: 9px 15px;
+    border-radius: 9px;
     font-size: 13px;
+    box-shadow: var(--shadow);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .2s ease;
+    transition: opacity .18s ease, transform .18s ease;
+    max-width: min(520px, calc(100vw - 30px));
   }
-  .mermaid-toast.show { opacity: 1; }
+  .mermaid-toast.show, .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
   .mermaid-error {
     margin: 14px 0;
     padding: 10px 14px;
-    color: #cf222e;
-    background: #fff1f0;
-    border: 1px solid #ffc1bc;
+    color: #b91c1c;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
     border-radius: 8px;
     font-size: 13px;
     white-space: pre-wrap;
     word-break: break-word;
   }
+  html[data-scheme="dark"] .mermaid-error {
+    color: #fecaca;
+    background: #3b0d0d;
+    border-color: #7f1d1d;
+  }
+
+  /* подсказка с полным текстом узла */
+  .node-tip {
+    position: fixed;
+    z-index: 120;
+    max-width: min(440px, calc(100vw - 24px));
+    padding: 8px 11px;
+    background: var(--tip-bg);
+    color: var(--tip-fg);
+    border-radius: 8px;
+    font-size: 12.5px;
+    line-height: 1.45;
+    box-shadow: var(--shadow);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity .1s ease, transform .1s ease;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .node-tip.show { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 980px) {
+    :root { --toc-width: 230px; }
+    main.content { padding: 4px 20px 80px; }
+  }
+  @media (max-width: 820px) {
+    .layout { grid-template-columns: 1fr; }
+    .splitter { display: none; }
+    .toc-panel {
+      position: static;
+      max-height: 45vh;
+      border: 0;
+      border-bottom: 1px solid var(--border);
+      border-radius: 0;
+    }
+    .layout.toc-collapsed { grid-template-columns: 1fr; }
+    .layout.toc-collapsed .toc-panel { display: none; }
+    main.content { grid-column: 1; grid-row: 2; padding: 16px; max-width: none; }
+    .topbar .sub { display: none; }
+  }
+  @media (max-width: 560px) {
+    .topbar { padding: 0 10px; }
+    .tb-btn { padding: 6px 8px; font-size: 12px; }
+    .mermaid-toolbar .hint { display: none; }
+  }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js" defer></script>
 </head>
 <body>
-<div class="topbar">
+
+<header class="topbar">
   <span class="dot"></span>
   <span class="title">Markdown Viewer</span>
   <span class="sub" id="file-name">файл не выбран</span>
-</div>
+  <div class="top-actions">
+    <button type="button" class="tb-btn" id="toc-top-toggle" title="Показать или скрыть оглавление">Оглавление</button>
+    <button type="button" class="tb-btn" id="open-btn">Открыть файл</button>
+    <div class="menu-wrap">
+      <button type="button" class="tb-btn" id="settings-btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="settings-pop">Настройки</button>
+      <div class="settings-pop" id="settings-pop" role="dialog" aria-label="Настройки вида">
+        <div class="sp-head">
+          <b>Настройки вида</b>
+          <button type="button" id="settings-close" title="Закрыть" aria-label="Закрыть настройки">&times;</button>
+        </div>
+        <div class="sp-body">
+          <div class="sp-group">
+            <div class="sp-label">Тема</div>
+            <div class="theme-grid" id="theme-grid"></div>
+          </div>
+          <div class="sp-group">
+            <label class="sp-label" for="font-select">Шрифт текста</label>
+            <select id="font-select">
+              <option value="auto">Из темы (рекомендуется)</option>
+              <option value="sans">Системный (Segoe UI)</option>
+              <option value="serif">С засечками (Georgia)</option>
+              <option value="humanist">Гуманистический (Candara)</option>
+              <option value="mono">Моноширинный</option>
+            </select>
+          </div>
+          <div class="sp-group">
+            <label class="sp-label" for="size-range">Размер текста</label>
+            <div class="range-row">
+              <input type="range" id="size-range" min="14" max="22" step="1">
+              <output id="size-val" for="size-range">16 px</output>
+            </div>
+          </div>
+          <div class="sp-group">
+            <label class="sp-check"><input type="checkbox" id="tip-check"> Показывать полный текст узлов при наведении</label>
+          </div>
+          <div class="sp-group">
+            <label class="sp-check"><input type="checkbox" id="wrap-check"> Переносить длинные строки в блоках кода</label>
+          </div>
+          <button type="button" class="sp-reset" id="settings-reset">Сбросить настройки</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
 
 <div class="dropbar" id="dropbar" role="button" tabindex="0">
   <span>Перетащите <b>.md</b> файл в окно</span>
@@ -355,23 +687,23 @@
   <span class="link">нажмите сюда, чтобы выбрать файл</span>
 </div>
 
-<div class="layout">
+<div class="layout" id="layout">
   <aside class="toc-panel">
     <div class="toc-head">
       <span class="toc-head-title">Оглавление</span>
       <button type="button" class="toc-toggle" id="toc-toggle" aria-controls="toc" aria-expanded="true" title="Скрыть оглавление">
-        <span class="icon" aria-hidden="true">«</span>
+        <span class="icon" aria-hidden="true">&laquo;</span>
       </button>
     </div>
     <nav class="toc" id="toc"></nav>
   </aside>
-  <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" title="Перетащите, чтобы изменить ширину (можно закрыть оглавление полностью)"></div>
+  <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" title="Перетащите, чтобы изменить ширину. Двойной клик - сброс"></div>
   <main class="content" id="content">
     <div class="empty">
-      <div class="big">Отройте Markdown-файл, чтобы увидеть его оформленным</div>
+      <div class="big">Откройте Markdown-файл, чтобы увидеть его оформленным</div>
       <ul>
-        <li>• перетащите файл прямо на страницу;</li>
-        <li>• или кликните по кнопке выше и выберите файл.</li>
+        <li>перетащите файл прямо на страницу;</li>
+        <li>или нажмите «Открыть файл» вверху.</li>
       </ul>
     </div>
   </main>
@@ -379,6 +711,8 @@
 
 <input type="file" id="file-input" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden>
 <div class="overlay" id="overlay">Отпустите файл, чтобы открыть</div>
+<div class="node-tip" id="node-tip" role="tooltip"></div>
+<div class="toast" id="toast"></div>
 
 <script>
 /**
@@ -389,11 +723,77 @@
 !function(e,t){"object"==typeof exports&&"undefined"!=typeof module?t(exports):"function"==typeof define&&define.amd?define(["exports"],t):t((e="undefined"!=typeof globalThis?globalThis:e||self).marked={})}(this,(function(e){"use strict";function t(){return{async:!1,breaks:!1,extensions:null,gfm:!0,hooks:null,pedantic:!1,renderer:null,silent:!1,tokenizer:null,walkTokens:null}}function n(t){e.defaults=t}e.defaults={async:!1,breaks:!1,extensions:null,gfm:!0,hooks:null,pedantic:!1,renderer:null,silent:!1,tokenizer:null,walkTokens:null};const s=/[&<>"']/,r=new RegExp(s.source,"g"),i=/[<>"']|&(?!(#\d{1,7}|#[Xx][a-fA-F0-9]{1,6}|\w+);)/,l=new RegExp(i.source,"g"),o={"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"},a=e=>o[e];function c(e,t){if(t){if(s.test(e))return e.replace(r,a)}else if(i.test(e))return e.replace(l,a);return e}const h=/&(#(?:\d+)|(?:#x[0-9A-Fa-f]+)|(?:\w+));?/gi;function p(e){return e.replace(h,((e,t)=>"colon"===(t=t.toLowerCase())?":":"#"===t.charAt(0)?"x"===t.charAt(1)?String.fromCharCode(parseInt(t.substring(2),16)):String.fromCharCode(+t.substring(1)):""))}const u=/(^|[^\[])\^/g;function k(e,t){let n="string"==typeof e?e:e.source;t=t||"";const s={replace:(e,t)=>{let r="string"==typeof t?t:t.source;return r=r.replace(u,"$1"),n=n.replace(e,r),s},getRegex:()=>new RegExp(n,t)};return s}function g(e){try{e=encodeURI(e).replace(/%25/g,"%")}catch(e){return null}return e}const f={exec:()=>null};function d(e,t){const n=e.replace(/\|/g,((e,t,n)=>{let s=!1,r=t;for(;--r>=0&&"\\"===n[r];)s=!s;return s?"|":" |"})).split(/ \|/);let s=0;if(n[0].trim()||n.shift(),n.length>0&&!n[n.length-1].trim()&&n.pop(),t)if(n.length>t)n.splice(t);else for(;n.length<t;)n.push("");for(;s<n.length;s++)n[s]=n[s].trim().replace(/\\\|/g,"|");return n}function x(e,t,n){const s=e.length;if(0===s)return"";let r=0;for(;r<s;){const i=e.charAt(s-r-1);if(i!==t||n){if(i===t||!n)break;r++}else r++}return e.slice(0,s-r)}function b(e,t,n,s){const r=t.href,i=t.title?c(t.title):null,l=e[1].replace(/\\([\[\]])/g,"$1");if("!"!==e[0].charAt(0)){s.state.inLink=!0;const e={type:"link",raw:n,href:r,title:i,text:l,tokens:s.inlineTokens(l)};return s.state.inLink=!1,e}return{type:"image",raw:n,href:r,title:i,text:c(l)}}class w{options;rules;lexer;constructor(t){this.options=t||e.defaults}space(e){const t=this.rules.block.newline.exec(e);if(t&&t[0].length>0)return{type:"space",raw:t[0]}}code(e){const t=this.rules.block.code.exec(e);if(t){const e=t[0].replace(/^ {1,4}/gm,"");return{type:"code",raw:t[0],codeBlockStyle:"indented",text:this.options.pedantic?e:x(e,"\n")}}}fences(e){const t=this.rules.block.fences.exec(e);if(t){const e=t[0],n=function(e,t){const n=e.match(/^(\s+)(?:```)/);if(null===n)return t;const s=n[1];return t.split("\n").map((e=>{const t=e.match(/^\s+/);if(null===t)return e;const[n]=t;return n.length>=s.length?e.slice(s.length):e})).join("\n")}(e,t[3]||"");return{type:"code",raw:e,lang:t[2]?t[2].trim().replace(this.rules.inline.anyPunctuation,"$1"):t[2],text:n}}}heading(e){const t=this.rules.block.heading.exec(e);if(t){let e=t[2].trim();if(/#$/.test(e)){const t=x(e,"#");this.options.pedantic?e=t.trim():t&&!/ $/.test(t)||(e=t.trim())}return{type:"heading",raw:t[0],depth:t[1].length,text:e,tokens:this.lexer.inline(e)}}}hr(e){const t=this.rules.block.hr.exec(e);if(t)return{type:"hr",raw:t[0]}}blockquote(e){const t=this.rules.block.blockquote.exec(e);if(t){const e=x(t[0].replace(/^ *>[ \t]?/gm,""),"\n"),n=this.lexer.state.top;this.lexer.state.top=!0;const s=this.lexer.blockTokens(e);return this.lexer.state.top=n,{type:"blockquote",raw:t[0],tokens:s,text:e}}}list(e){let t=this.rules.block.list.exec(e);if(t){let n=t[1].trim();const s=n.length>1,r={type:"list",raw:"",ordered:s,start:s?+n.slice(0,-1):"",loose:!1,items:[]};n=s?`\\d{1,9}\\${n.slice(-1)}`:`\\${n}`,this.options.pedantic&&(n=s?n:"[*+-]");const i=new RegExp(`^( {0,3}${n})((?:[\t ][^\\n]*)?(?:\\n|$))`);let l="",o="",a=!1;for(;e;){let n=!1;if(!(t=i.exec(e)))break;if(this.rules.block.hr.test(e))break;l=t[0],e=e.substring(l.length);let s=t[2].split("\n",1)[0].replace(/^\t+/,(e=>" ".repeat(3*e.length))),c=e.split("\n",1)[0],h=0;this.options.pedantic?(h=2,o=s.trimStart()):(h=t[2].search(/[^ ]/),h=h>4?1:h,o=s.slice(h),h+=t[1].length);let p=!1;if(!s&&/^ *$/.test(c)&&(l+=c+"\n",e=e.substring(c.length+1),n=!0),!n){const t=new RegExp(`^ {0,${Math.min(3,h-1)}}(?:[*+-]|\\d{1,9}[.)])((?:[ \t][^\\n]*)?(?:\\n|$))`),n=new RegExp(`^ {0,${Math.min(3,h-1)}}((?:- *){3,}|(?:_ *){3,}|(?:\\* *){3,})(?:\\n+|$)`),r=new RegExp(`^ {0,${Math.min(3,h-1)}}(?:\`\`\`|~~~)`),i=new RegExp(`^ {0,${Math.min(3,h-1)}}#`);for(;e;){const a=e.split("\n",1)[0];if(c=a,this.options.pedantic&&(c=c.replace(/^ {1,4}(?=( {4})*[^ ])/g,"  ")),r.test(c))break;if(i.test(c))break;if(t.test(c))break;if(n.test(e))break;if(c.search(/[^ ]/)>=h||!c.trim())o+="\n"+c.slice(h);else{if(p)break;if(s.search(/[^ ]/)>=4)break;if(r.test(s))break;if(i.test(s))break;if(n.test(s))break;o+="\n"+c}p||c.trim()||(p=!0),l+=a+"\n",e=e.substring(a.length+1),s=c.slice(h)}}r.loose||(a?r.loose=!0:/\n *\n *$/.test(l)&&(a=!0));let u,k=null;this.options.gfm&&(k=/^\[[ xX]\] /.exec(o),k&&(u="[ ] "!==k[0],o=o.replace(/^\[[ xX]\] +/,""))),r.items.push({type:"list_item",raw:l,task:!!k,checked:u,loose:!1,text:o,tokens:[]}),r.raw+=l}r.items[r.items.length-1].raw=l.trimEnd(),r.items[r.items.length-1].text=o.trimEnd(),r.raw=r.raw.trimEnd();for(let e=0;e<r.items.length;e++)if(this.lexer.state.top=!1,r.items[e].tokens=this.lexer.blockTokens(r.items[e].text,[]),!r.loose){const t=r.items[e].tokens.filter((e=>"space"===e.type)),n=t.length>0&&t.some((e=>/\n.*\n/.test(e.raw)));r.loose=n}if(r.loose)for(let e=0;e<r.items.length;e++)r.items[e].loose=!0;return r}}html(e){const t=this.rules.block.html.exec(e);if(t){return{type:"html",block:!0,raw:t[0],pre:"pre"===t[1]||"script"===t[1]||"style"===t[1],text:t[0]}}}def(e){const t=this.rules.block.def.exec(e);if(t){const e=t[1].toLowerCase().replace(/\s+/g," "),n=t[2]?t[2].replace(/^<(.*)>$/,"$1").replace(this.rules.inline.anyPunctuation,"$1"):"",s=t[3]?t[3].substring(1,t[3].length-1).replace(this.rules.inline.anyPunctuation,"$1"):t[3];return{type:"def",tag:e,raw:t[0],href:n,title:s}}}table(e){const t=this.rules.block.table.exec(e);if(!t)return;if(!/[:|]/.test(t[2]))return;const n=d(t[1]),s=t[2].replace(/^\||\| *$/g,"").split("|"),r=t[3]&&t[3].trim()?t[3].replace(/\n[ \t]*$/,"").split("\n"):[],i={type:"table",raw:t[0],header:[],align:[],rows:[]};if(n.length===s.length){for(const e of s)/^ *-+: *$/.test(e)?i.align.push("right"):/^ *:-+: *$/.test(e)?i.align.push("center"):/^ *:-+ *$/.test(e)?i.align.push("left"):i.align.push(null);for(const e of n)i.header.push({text:e,tokens:this.lexer.inline(e)});for(const e of r)i.rows.push(d(e,i.header.length).map((e=>({text:e,tokens:this.lexer.inline(e)}))));return i}}lheading(e){const t=this.rules.block.lheading.exec(e);if(t)return{type:"heading",raw:t[0],depth:"="===t[2].charAt(0)?1:2,text:t[1],tokens:this.lexer.inline(t[1])}}paragraph(e){const t=this.rules.block.paragraph.exec(e);if(t){const e="\n"===t[1].charAt(t[1].length-1)?t[1].slice(0,-1):t[1];return{type:"paragraph",raw:t[0],text:e,tokens:this.lexer.inline(e)}}}text(e){const t=this.rules.block.text.exec(e);if(t)return{type:"text",raw:t[0],text:t[0],tokens:this.lexer.inline(t[0])}}escape(e){const t=this.rules.inline.escape.exec(e);if(t)return{type:"escape",raw:t[0],text:c(t[1])}}tag(e){const t=this.rules.inline.tag.exec(e);if(t)return!this.lexer.state.inLink&&/^<a /i.test(t[0])?this.lexer.state.inLink=!0:this.lexer.state.inLink&&/^<\/a>/i.test(t[0])&&(this.lexer.state.inLink=!1),!this.lexer.state.inRawBlock&&/^<(pre|code|kbd|script)(\s|>)/i.test(t[0])?this.lexer.state.inRawBlock=!0:this.lexer.state.inRawBlock&&/^<\/(pre|code|kbd|script)(\s|>)/i.test(t[0])&&(this.lexer.state.inRawBlock=!1),{type:"html",raw:t[0],inLink:this.lexer.state.inLink,inRawBlock:this.lexer.state.inRawBlock,block:!1,text:t[0]}}link(e){const t=this.rules.inline.link.exec(e);if(t){const e=t[2].trim();if(!this.options.pedantic&&/^</.test(e)){if(!/>$/.test(e))return;const t=x(e.slice(0,-1),"\\");if((e.length-t.length)%2==0)return}else{const e=function(e,t){if(-1===e.indexOf(t[1]))return-1;let n=0;for(let s=0;s<e.length;s++)if("\\"===e[s])s++;else if(e[s]===t[0])n++;else if(e[s]===t[1]&&(n--,n<0))return s;return-1}(t[2],"()");if(e>-1){const n=(0===t[0].indexOf("!")?5:4)+t[1].length+e;t[2]=t[2].substring(0,e),t[0]=t[0].substring(0,n).trim(),t[3]=""}}let n=t[2],s="";if(this.options.pedantic){const e=/^([^'"]*[^\s])\s+(['"])(.*)\2/.exec(n);e&&(n=e[1],s=e[3])}else s=t[3]?t[3].slice(1,-1):"";return n=n.trim(),/^</.test(n)&&(n=this.options.pedantic&&!/>$/.test(e)?n.slice(1):n.slice(1,-1)),b(t,{href:n?n.replace(this.rules.inline.anyPunctuation,"$1"):n,title:s?s.replace(this.rules.inline.anyPunctuation,"$1"):s},t[0],this.lexer)}}reflink(e,t){let n;if((n=this.rules.inline.reflink.exec(e))||(n=this.rules.inline.nolink.exec(e))){const e=t[(n[2]||n[1]).replace(/\s+/g," ").toLowerCase()];if(!e){const e=n[0].charAt(0);return{type:"text",raw:e,text:e}}return b(n,e,n[0],this.lexer)}}emStrong(e,t,n=""){let s=this.rules.inline.emStrongLDelim.exec(e);if(!s)return;if(s[3]&&n.match(/[\p{L}\p{N}]/u))return;if(!(s[1]||s[2]||"")||!n||this.rules.inline.punctuation.exec(n)){const n=[...s[0]].length-1;let r,i,l=n,o=0;const a="*"===s[0][0]?this.rules.inline.emStrongRDelimAst:this.rules.inline.emStrongRDelimUnd;for(a.lastIndex=0,t=t.slice(-1*e.length+n);null!=(s=a.exec(t));){if(r=s[1]||s[2]||s[3]||s[4]||s[5]||s[6],!r)continue;if(i=[...r].length,s[3]||s[4]){l+=i;continue}if((s[5]||s[6])&&n%3&&!((n+i)%3)){o+=i;continue}if(l-=i,l>0)continue;i=Math.min(i,i+l+o);const t=[...s[0]][0].length,a=e.slice(0,n+s.index+t+i);if(Math.min(n,i)%2){const e=a.slice(1,-1);return{type:"em",raw:a,text:e,tokens:this.lexer.inlineTokens(e)}}const c=a.slice(2,-2);return{type:"strong",raw:a,text:c,tokens:this.lexer.inlineTokens(c)}}}}codespan(e){const t=this.rules.inline.code.exec(e);if(t){let e=t[2].replace(/\n/g," ");const n=/[^ ]/.test(e),s=/^ /.test(e)&&/ $/.test(e);return n&&s&&(e=e.substring(1,e.length-1)),e=c(e,!0),{type:"codespan",raw:t[0],text:e}}}br(e){const t=this.rules.inline.br.exec(e);if(t)return{type:"br",raw:t[0]}}del(e){const t=this.rules.inline.del.exec(e);if(t)return{type:"del",raw:t[0],text:t[2],tokens:this.lexer.inlineTokens(t[2])}}autolink(e){const t=this.rules.inline.autolink.exec(e);if(t){let e,n;return"@"===t[2]?(e=c(t[1]),n="mailto:"+e):(e=c(t[1]),n=e),{type:"link",raw:t[0],text:e,href:n,tokens:[{type:"text",raw:e,text:e}]}}}url(e){let t;if(t=this.rules.inline.url.exec(e)){let e,n;if("@"===t[2])e=c(t[0]),n="mailto:"+e;else{let s;do{s=t[0],t[0]=this.rules.inline._backpedal.exec(t[0])?.[0]??""}while(s!==t[0]);e=c(t[0]),n="www."===t[1]?"http://"+t[0]:t[0]}return{type:"link",raw:t[0],text:e,href:n,tokens:[{type:"text",raw:e,text:e}]}}}inlineText(e){const t=this.rules.inline.text.exec(e);if(t){let e;return e=this.lexer.state.inRawBlock?t[0]:c(t[0]),{type:"text",raw:t[0],text:e}}}}const m=/^ {0,3}((?:-[\t ]*){3,}|(?:_[ \t]*){3,}|(?:\*[ \t]*){3,})(?:\n+|$)/,y=/(?:[*+-]|\d{1,9}[.)])/,$=k(/^(?!bull )((?:.|\n(?!\s*?\n|bull ))+?)\n {0,3}(=+|-+) *(?:\n+|$)/).replace(/bull/g,y).getRegex(),z=/^([^\n]+(?:\n(?!hr|heading|lheading|blockquote|fences|list|html|table| +\n)[^\n]+)*)/,T=/(?!\s*\])(?:\\.|[^\[\]\\])+/,R=k(/^ {0,3}\[(label)\]: *(?:\n *)?([^<\s][^\s]*|<.*?>)(?:(?: +(?:\n *)?| *\n *)(title))? *(?:\n+|$)/).replace("label",T).replace("title",/(?:"(?:\\"?|[^"\\])*"|'[^'\n]*(?:\n[^'\n]+)*\n?'|\([^()]*\))/).getRegex(),_=k(/^( {0,3}bull)([ \t][^\n]+?)?(?:\n|$)/).replace(/bull/g,y).getRegex(),A="address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|meta|nav|noframes|ol|optgroup|option|p|param|section|source|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul",S=/<!--(?!-?>)[\s\S]*?(?:-->|$)/,I=k("^ {0,3}(?:<(script|pre|style|textarea)[\\s>][\\s\\S]*?(?:</\\1>[^\\n]*\\n+|$)|comment[^\\n]*(\\n+|$)|<\\?[\\s\\S]*?(?:\\?>\\n*|$)|<![A-Z][\\s\\S]*?(?:>\\n*|$)|<!\\[CDATA\\[[\\s\\S]*?(?:\\]\\]>\\n*|$)|</?(tag)(?: +|\\n|/?>)[\\s\\S]*?(?:(?:\\n *)+\\n|$)|<(?!script|pre|style|textarea)([a-z][\\w-]*)(?:attribute)*? */?>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n *)+\\n|$)|</(?!script|pre|style|textarea)[a-z][\\w-]*\\s*>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n *)+\\n|$))","i").replace("comment",S).replace("tag",A).replace("attribute",/ +[a-zA-Z:_][\w.:-]*(?: *= *"[^"\n]*"| *= *'[^'\n]*'| *= *[^\s"'=<>`]+)?/).getRegex(),E=k(z).replace("hr",m).replace("heading"," {0,3}#{1,6}(?:\\s|$)").replace("|lheading","").replace("|table","").replace("blockquote"," {0,3}>").replace("fences"," {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list"," {0,3}(?:[*+-]|1[.)]) ").replace("html","</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag",A).getRegex(),Z={blockquote:k(/^( {0,3}> ?(paragraph|[^\n]*)(?:\n|$))+/).replace("paragraph",E).getRegex(),code:/^( {4}[^\n]+(?:\n(?: *(?:\n|$))*)?)+/,def:R,fences:/^ {0,3}(`{3,}(?=[^`\n]*(?:\n|$))|~{3,})([^\n]*)(?:\n|$)(?:|([\s\S]*?)(?:\n|$))(?: {0,3}\1[~`]* *(?=\n|$)|$)/,heading:/^ {0,3}(#{1,6})(?=\s|$)(.*)(?:\n+|$)/,hr:m,html:I,lheading:$,list:_,newline:/^(?: *(?:\n|$))+/,paragraph:E,table:f,text:/^[^\n]+/},q=k("^ *([^\\n ].*)\\n {0,3}((?:\\| *)?:?-+:? *(?:\\| *:?-+:? *)*(?:\\| *)?)(?:\\n((?:(?! *\\n|hr|heading|blockquote|code|fences|list|html).*(?:\\n|$))*)\\n*|$)").replace("hr",m).replace("heading"," {0,3}#{1,6}(?:\\s|$)").replace("blockquote"," {0,3}>").replace("code"," {4}[^\\n]").replace("fences"," {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list"," {0,3}(?:[*+-]|1[.)]) ").replace("html","</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag",A).getRegex(),L={...Z,table:q,paragraph:k(z).replace("hr",m).replace("heading"," {0,3}#{1,6}(?:\\s|$)").replace("|lheading","").replace("table",q).replace("blockquote"," {0,3}>").replace("fences"," {0,3}(?:`{3,}(?=[^`\\n]*\\n)|~{3,})[^\\n]*\\n").replace("list"," {0,3}(?:[*+-]|1[.)]) ").replace("html","</?(?:tag)(?: +|\\n|/?>)|<(?:script|pre|style|textarea|!--)").replace("tag",A).getRegex()},P={...Z,html:k("^ *(?:comment *(?:\\n|\\s*$)|<(tag)[\\s\\S]+?</\\1> *(?:\\n{2,}|\\s*$)|<tag(?:\"[^\"]*\"|'[^']*'|\\s[^'\"/>\\s]*)*?/?> *(?:\\n{2,}|\\s*$))").replace("comment",S).replace(/tag/g,"(?!(?:a|em|strong|small|s|cite|q|dfn|abbr|data|time|code|var|samp|kbd|sub|sup|i|b|u|mark|ruby|rt|rp|bdi|bdo|span|br|wbr|ins|del|img)\\b)\\w+(?!:|[^\\w\\s@]*@)\\b").getRegex(),def:/^ *\[([^\]]+)\]: *<?([^\s>]+)>?(?: +(["(][^\n]+[")]))? *(?:\n+|$)/,heading:/^(#{1,6})(.*)(?:\n+|$)/,fences:f,lheading:/^(.+?)\n {0,3}(=+|-+) *(?:\n+|$)/,paragraph:k(z).replace("hr",m).replace("heading"," *#{1,6} *[^\n]").replace("lheading",$).replace("|table","").replace("blockquote"," {0,3}>").replace("|fences","").replace("|list","").replace("|html","").replace("|tag","").getRegex()},Q=/^\\([!"#$%&'()*+,\-./:;<=>?@\[\]\\^_`{|}~])/,v=/^( {2,}|\\)\n(?!\s*$)/,B="\\p{P}$+<=>`^|~",M=k(/^((?![*_])[\spunctuation])/,"u").replace(/punctuation/g,B).getRegex(),O=k(/^(?:\*+(?:((?!\*)[punct])|[^\s*]))|^_+(?:((?!_)[punct])|([^\s_]))/,"u").replace(/punct/g,B).getRegex(),C=k("^[^_*]*?__[^_*]*?\\*[^_*]*?(?=__)|[^*]+(?=[^*])|(?!\\*)[punct](\\*+)(?=[\\s]|$)|[^punct\\s](\\*+)(?!\\*)(?=[punct\\s]|$)|(?!\\*)[punct\\s](\\*+)(?=[^punct\\s])|[\\s](\\*+)(?!\\*)(?=[punct])|(?!\\*)[punct](\\*+)(?!\\*)(?=[punct])|[^punct\\s](\\*+)(?=[^punct\\s])","gu").replace(/punct/g,B).getRegex(),D=k("^[^_*]*?\\*\\*[^_*]*?_[^_*]*?(?=\\*\\*)|[^_]+(?=[^_])|(?!_)[punct](_+)(?=[\\s]|$)|[^punct\\s](_+)(?!_)(?=[punct\\s]|$)|(?!_)[punct\\s](_+)(?=[^punct\\s])|[\\s](_+)(?!_)(?=[punct])|(?!_)[punct](_+)(?!_)(?=[punct])","gu").replace(/punct/g,B).getRegex(),j=k(/\\([punct])/,"gu").replace(/punct/g,B).getRegex(),H=k(/^<(scheme:[^\s\x00-\x1f<>]*|email)>/).replace("scheme",/[a-zA-Z][a-zA-Z0-9+.-]{1,31}/).replace("email",/[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+(@)[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+(?![-_])/).getRegex(),U=k(S).replace("(?:--\x3e|$)","--\x3e").getRegex(),X=k("^comment|^</[a-zA-Z][\\w:-]*\\s*>|^<[a-zA-Z][\\w-]*(?:attribute)*?\\s*/?>|^<\\?[\\s\\S]*?\\?>|^<![a-zA-Z]+\\s[\\s\\S]*?>|^<!\\[CDATA\\[[\\s\\S]*?\\]\\]>").replace("comment",U).replace("attribute",/\s+[a-zA-Z:_][\w.:-]*(?:\s*=\s*"[^"]*"|\s*=\s*'[^']*'|\s*=\s*[^\s"'=<>`]+)?/).getRegex(),F=/(?:\[(?:\\.|[^\[\]\\])*\]|\\.|`[^`]*`|[^\[\]\\`])*?/,N=k(/^!?\[(label)\]\(\s*(href)(?:\s+(title))?\s*\)/).replace("label",F).replace("href",/<(?:\\.|[^\n<>\\])+>|[^\s\x00-\x1f]*/).replace("title",/"(?:\\"?|[^"\\])*"|'(?:\\'?|[^'\\])*'|\((?:\\\)?|[^)\\])*\)/).getRegex(),G=k(/^!?\[(label)\]\[(ref)\]/).replace("label",F).replace("ref",T).getRegex(),J=k(/^!?\[(ref)\](?:\[\])?/).replace("ref",T).getRegex(),K={_backpedal:f,anyPunctuation:j,autolink:H,blockSkip:/\[[^[\]]*?\]\([^\(\)]*?\)|`[^`]*?`|<[^<>]*?>/g,br:v,code:/^(`+)([^`]|[^`][\s\S]*?[^`])\1(?!`)/,del:f,emStrongLDelim:O,emStrongRDelimAst:C,emStrongRDelimUnd:D,escape:Q,link:N,nolink:J,punctuation:M,reflink:G,reflinkSearch:k("reflink|nolink(?!\\()","g").replace("reflink",G).replace("nolink",J).getRegex(),tag:X,text:/^(`+|[^`])(?:(?= {2,}\n)|[\s\S]*?(?:(?=[\\<!\[`*_]|\b_|$)|[^ ](?= {2,}\n)))/,url:f},V={...K,link:k(/^!?\[(label)\]\((.*?)\)/).replace("label",F).getRegex(),reflink:k(/^!?\[(label)\]\s*\[([^\]]*)\]/).replace("label",F).getRegex()},W={...K,escape:k(Q).replace("])","~|])").getRegex(),url:k(/^((?:ftp|https?):\/\/|www\.)(?:[a-zA-Z0-9\-]+\.?)+[^\s<]*|^email/,"i").replace("email",/[A-Za-z0-9._+-]+(@)[a-zA-Z0-9-_]+(?:\.[a-zA-Z0-9-_]*[a-zA-Z0-9])+(?![-_])/).getRegex(),_backpedal:/(?:[^?!.,:;*_'"~()&]+|\([^)]*\)|&(?![a-zA-Z0-9]+;$)|[?!.,:;*_'"~)]+(?!$))+/,del:/^(~~?)(?=[^\s~])([\s\S]*?[^\s~])\1(?=[^~]|$)/,text:/^([`~]+|[^`~])(?:(?= {2,}\n)|(?=[a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-]+@)|[\s\S]*?(?:(?=[\\<!\[`*~_]|\b_|https?:\/\/|ftp:\/\/|www\.|$)|[^ ](?= {2,}\n)|[^a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-](?=[a-zA-Z0-9.!#$%&'*+\/=?_`{\|}~-]+@)))/},Y={...W,br:k(v).replace("{2,}","*").getRegex(),text:k(W.text).replace("\\b_","\\b_| {2,}\\n").replace(/\{2,\}/g,"*").getRegex()},ee={normal:Z,gfm:L,pedantic:P},te={normal:K,gfm:W,breaks:Y,pedantic:V};class ne{tokens;options;state;tokenizer;inlineQueue;constructor(t){this.tokens=[],this.tokens.links=Object.create(null),this.options=t||e.defaults,this.options.tokenizer=this.options.tokenizer||new w,this.tokenizer=this.options.tokenizer,this.tokenizer.options=this.options,this.tokenizer.lexer=this,this.inlineQueue=[],this.state={inLink:!1,inRawBlock:!1,top:!0};const n={block:ee.normal,inline:te.normal};this.options.pedantic?(n.block=ee.pedantic,n.inline=te.pedantic):this.options.gfm&&(n.block=ee.gfm,this.options.breaks?n.inline=te.breaks:n.inline=te.gfm),this.tokenizer.rules=n}static get rules(){return{block:ee,inline:te}}static lex(e,t){return new ne(t).lex(e)}static lexInline(e,t){return new ne(t).inlineTokens(e)}lex(e){e=e.replace(/\r\n|\r/g,"\n"),this.blockTokens(e,this.tokens);for(let e=0;e<this.inlineQueue.length;e++){const t=this.inlineQueue[e];this.inlineTokens(t.src,t.tokens)}return this.inlineQueue=[],this.tokens}blockTokens(e,t=[]){let n,s,r,i;for(e=this.options.pedantic?e.replace(/\t/g,"    ").replace(/^ +$/gm,""):e.replace(/^( *)(\t+)/gm,((e,t,n)=>t+"    ".repeat(n.length)));e;)if(!(this.options.extensions&&this.options.extensions.block&&this.options.extensions.block.some((s=>!!(n=s.call({lexer:this},e,t))&&(e=e.substring(n.raw.length),t.push(n),!0)))))if(n=this.tokenizer.space(e))e=e.substring(n.raw.length),1===n.raw.length&&t.length>0?t[t.length-1].raw+="\n":t.push(n);else if(n=this.tokenizer.code(e))e=e.substring(n.raw.length),s=t[t.length-1],!s||"paragraph"!==s.type&&"text"!==s.type?t.push(n):(s.raw+="\n"+n.raw,s.text+="\n"+n.text,this.inlineQueue[this.inlineQueue.length-1].src=s.text);else if(n=this.tokenizer.fences(e))e=e.substring(n.raw.length),t.push(n);else if(n=this.tokenizer.heading(e))e=e.substring(n.raw.length),t.push(n);else if(n=this.tokenizer.hr(e))e=e.substring(n.raw.length),t.push(n);else if(n=this.tokenizer.blockquote(e))e=e.substring(n.raw.length),t.push(n);else if(n=this.tokenizer.list(e))e=e.substring(n.raw.length),t.push(n);else if(n=this.tokenizer.html(e))e=e.substring(n.raw.length),t.push(n);else if(n=this.tokenizer.def(e))e=e.substring(n.raw.length),s=t[t.length-1],!s||"paragraph"!==s.type&&"text"!==s.type?this.tokens.links[n.tag]||(this.tokens.links[n.tag]={href:n.href,title:n.title}):(s.raw+="\n"+n.raw,s.text+="\n"+n.raw,this.inlineQueue[this.inlineQueue.length-1].src=s.text);else if(n=this.tokenizer.table(e))e=e.substring(n.raw.length),t.push(n);else if(n=this.tokenizer.lheading(e))e=e.substring(n.raw.length),t.push(n);else{if(r=e,this.options.extensions&&this.options.extensions.startBlock){let t=1/0;const n=e.slice(1);let s;this.options.extensions.startBlock.forEach((e=>{s=e.call({lexer:this},n),"number"==typeof s&&s>=0&&(t=Math.min(t,s))})),t<1/0&&t>=0&&(r=e.substring(0,t+1))}if(this.state.top&&(n=this.tokenizer.paragraph(r)))s=t[t.length-1],i&&"paragraph"===s.type?(s.raw+="\n"+n.raw,s.text+="\n"+n.text,this.inlineQueue.pop(),this.inlineQueue[this.inlineQueue.length-1].src=s.text):t.push(n),i=r.length!==e.length,e=e.substring(n.raw.length);else if(n=this.tokenizer.text(e))e=e.substring(n.raw.length),s=t[t.length-1],s&&"text"===s.type?(s.raw+="\n"+n.raw,s.text+="\n"+n.text,this.inlineQueue.pop(),this.inlineQueue[this.inlineQueue.length-1].src=s.text):t.push(n);else if(e){const t="Infinite loop on byte: "+e.charCodeAt(0);if(this.options.silent){console.error(t);break}throw new Error(t)}}return this.state.top=!0,t}inline(e,t=[]){return this.inlineQueue.push({src:e,tokens:t}),t}inlineTokens(e,t=[]){let n,s,r,i,l,o,a=e;if(this.tokens.links){const e=Object.keys(this.tokens.links);if(e.length>0)for(;null!=(i=this.tokenizer.rules.inline.reflinkSearch.exec(a));)e.includes(i[0].slice(i[0].lastIndexOf("[")+1,-1))&&(a=a.slice(0,i.index)+"["+"a".repeat(i[0].length-2)+"]"+a.slice(this.tokenizer.rules.inline.reflinkSearch.lastIndex))}for(;null!=(i=this.tokenizer.rules.inline.blockSkip.exec(a));)a=a.slice(0,i.index)+"["+"a".repeat(i[0].length-2)+"]"+a.slice(this.tokenizer.rules.inline.blockSkip.lastIndex);for(;null!=(i=this.tokenizer.rules.inline.anyPunctuation.exec(a));)a=a.slice(0,i.index)+"++"+a.slice(this.tokenizer.rules.inline.anyPunctuation.lastIndex);for(;e;)if(l||(o=""),l=!1,!(this.options.extensions&&this.options.extensions.inline&&this.options.extensions.inline.some((s=>!!(n=s.call({lexer:this},e,t))&&(e=e.substring(n.raw.length),t.push(n),!0)))))if(n=this.tokenizer.escape(e))e=e.substring(n.raw.length),t.push(n);else if(n=this.tokenizer.tag(e))e=e.substring(n.raw.length),s=t[t.length-1],s&&"text"===n.type&&"text"===s.type?(s.raw+=n.raw,s.text+=n.text):t.push(n);else if(n=this.tokenizer.link(e))e=e.substring(n.raw.length),t.push(n);else if(n=this.tokenizer.reflink(e,this.tokens.links))e=e.substring(n.raw.length),s=t[t.length-1],s&&"text"===n.type&&"text"===s.type?(s.raw+=n.raw,s.text+=n.text):t.push(n);else if(n=this.tokenizer.emStrong(e,a,o))e=e.substring(n.raw.length),t.push(n);else if(n=this.tokenizer.codespan(e))e=e.substring(n.raw.length),t.push(n);else if(n=this.tokenizer.br(e))e=e.substring(n.raw.length),t.push(n);else if(n=this.tokenizer.del(e))e=e.substring(n.raw.length),t.push(n);else if(n=this.tokenizer.autolink(e))e=e.substring(n.raw.length),t.push(n);else if(this.state.inLink||!(n=this.tokenizer.url(e))){if(r=e,this.options.extensions&&this.options.extensions.startInline){let t=1/0;const n=e.slice(1);let s;this.options.extensions.startInline.forEach((e=>{s=e.call({lexer:this},n),"number"==typeof s&&s>=0&&(t=Math.min(t,s))})),t<1/0&&t>=0&&(r=e.substring(0,t+1))}if(n=this.tokenizer.inlineText(r))e=e.substring(n.raw.length),"_"!==n.raw.slice(-1)&&(o=n.raw.slice(-1)),l=!0,s=t[t.length-1],s&&"text"===s.type?(s.raw+=n.raw,s.text+=n.text):t.push(n);else if(e){const t="Infinite loop on byte: "+e.charCodeAt(0);if(this.options.silent){console.error(t);break}throw new Error(t)}}else e=e.substring(n.raw.length),t.push(n);return t}}class se{options;constructor(t){this.options=t||e.defaults}code(e,t,n){const s=(t||"").match(/^\S*/)?.[0];return e=e.replace(/\n$/,"")+"\n",s?'<pre><code class="language-'+c(s)+'">'+(n?e:c(e,!0))+"</code></pre>\n":"<pre><code>"+(n?e:c(e,!0))+"</code></pre>\n"}blockquote(e){return`<blockquote>\n${e}</blockquote>\n`}html(e,t){return e}heading(e,t,n){return`<h${t}>${e}</h${t}>\n`}hr(){return"<hr>\n"}list(e,t,n){const s=t?"ol":"ul";return"<"+s+(t&&1!==n?' start="'+n+'"':"")+">\n"+e+"</"+s+">\n"}listitem(e,t,n){return`<li>${e}</li>\n`}checkbox(e){return"<input "+(e?'checked="" ':"")+'disabled="" type="checkbox">'}paragraph(e){return`<p>${e}</p>\n`}table(e,t){return t&&(t=`<tbody>${t}</tbody>`),"<table>\n<thead>\n"+e+"</thead>\n"+t+"</table>\n"}tablerow(e){return`<tr>\n${e}</tr>\n`}tablecell(e,t){const n=t.header?"th":"td";return(t.align?`<${n} align="${t.align}">`:`<${n}>`)+e+`</${n}>\n`}strong(e){return`<strong>${e}</strong>`}em(e){return`<em>${e}</em>`}codespan(e){return`<code>${e}</code>`}br(){return"<br>"}del(e){return`<del>${e}</del>`}link(e,t,n){const s=g(e);if(null===s)return n;let r='<a href="'+(e=s)+'"';return t&&(r+=' title="'+t+'"'),r+=">"+n+"</a>",r}image(e,t,n){const s=g(e);if(null===s)return n;let r=`<img src="${e=s}" alt="${n}"`;return t&&(r+=` title="${t}"`),r+=">",r}text(e){return e}}class re{strong(e){return e}em(e){return e}codespan(e){return e}del(e){return e}html(e){return e}text(e){return e}link(e,t,n){return""+n}image(e,t,n){return""+n}br(){return""}}class ie{options;renderer;textRenderer;constructor(t){this.options=t||e.defaults,this.options.renderer=this.options.renderer||new se,this.renderer=this.options.renderer,this.renderer.options=this.options,this.textRenderer=new re}static parse(e,t){return new ie(t).parse(e)}static parseInline(e,t){return new ie(t).parseInline(e)}parse(e,t=!0){let n="";for(let s=0;s<e.length;s++){const r=e[s];if(this.options.extensions&&this.options.extensions.renderers&&this.options.extensions.renderers[r.type]){const e=r,t=this.options.extensions.renderers[e.type].call({parser:this},e);if(!1!==t||!["space","hr","heading","code","table","blockquote","list","html","paragraph","text"].includes(e.type)){n+=t||"";continue}}switch(r.type){case"space":continue;case"hr":n+=this.renderer.hr();continue;case"heading":{const e=r;n+=this.renderer.heading(this.parseInline(e.tokens),e.depth,p(this.parseInline(e.tokens,this.textRenderer)));continue}case"code":{const e=r;n+=this.renderer.code(e.text,e.lang,!!e.escaped);continue}case"table":{const e=r;let t="",s="";for(let t=0;t<e.header.length;t++)s+=this.renderer.tablecell(this.parseInline(e.header[t].tokens),{header:!0,align:e.align[t]});t+=this.renderer.tablerow(s);let i="";for(let t=0;t<e.rows.length;t++){const n=e.rows[t];s="";for(let t=0;t<n.length;t++)s+=this.renderer.tablecell(this.parseInline(n[t].tokens),{header:!1,align:e.align[t]});i+=this.renderer.tablerow(s)}n+=this.renderer.table(t,i);continue}case"blockquote":{const e=r,t=this.parse(e.tokens);n+=this.renderer.blockquote(t);continue}case"list":{const e=r,t=e.ordered,s=e.start,i=e.loose;let l="";for(let t=0;t<e.items.length;t++){const n=e.items[t],s=n.checked,r=n.task;let o="";if(n.task){const e=this.renderer.checkbox(!!s);i?n.tokens.length>0&&"paragraph"===n.tokens[0].type?(n.tokens[0].text=e+" "+n.tokens[0].text,n.tokens[0].tokens&&n.tokens[0].tokens.length>0&&"text"===n.tokens[0].tokens[0].type&&(n.tokens[0].tokens[0].text=e+" "+n.tokens[0].tokens[0].text)):n.tokens.unshift({type:"text",text:e+" "}):o+=e+" "}o+=this.parse(n.tokens,i),l+=this.renderer.listitem(o,r,!!s)}n+=this.renderer.list(l,t,s);continue}case"html":{const e=r;n+=this.renderer.html(e.text,e.block);continue}case"paragraph":{const e=r;n+=this.renderer.paragraph(this.parseInline(e.tokens));continue}case"text":{let i=r,l=i.tokens?this.parseInline(i.tokens):i.text;for(;s+1<e.length&&"text"===e[s+1].type;)i=e[++s],l+="\n"+(i.tokens?this.parseInline(i.tokens):i.text);n+=t?this.renderer.paragraph(l):l;continue}default:{const e='Token with "'+r.type+'" type was not found.';if(this.options.silent)return console.error(e),"";throw new Error(e)}}}return n}parseInline(e,t){t=t||this.renderer;let n="";for(let s=0;s<e.length;s++){const r=e[s];if(this.options.extensions&&this.options.extensions.renderers&&this.options.extensions.renderers[r.type]){const e=this.options.extensions.renderers[r.type].call({parser:this},r);if(!1!==e||!["escape","html","link","image","strong","em","codespan","br","del","text"].includes(r.type)){n+=e||"";continue}}switch(r.type){case"escape":{const e=r;n+=t.text(e.text);break}case"html":{const e=r;n+=t.html(e.text);break}case"link":{const e=r;n+=t.link(e.href,e.title,this.parseInline(e.tokens,t));break}case"image":{const e=r;n+=t.image(e.href,e.title,e.text);break}case"strong":{const e=r;n+=t.strong(this.parseInline(e.tokens,t));break}case"em":{const e=r;n+=t.em(this.parseInline(e.tokens,t));break}case"codespan":{const e=r;n+=t.codespan(e.text);break}case"br":n+=t.br();break;case"del":{const e=r;n+=t.del(this.parseInline(e.tokens,t));break}case"text":{const e=r;n+=t.text(e.text);break}default:{const e='Token with "'+r.type+'" type was not found.';if(this.options.silent)return console.error(e),"";throw new Error(e)}}}return n}}class le{options;constructor(t){this.options=t||e.defaults}static passThroughHooks=new Set(["preprocess","postprocess","processAllTokens"]);preprocess(e){return e}postprocess(e){return e}processAllTokens(e){return e}}class oe{defaults={async:!1,breaks:!1,extensions:null,gfm:!0,hooks:null,pedantic:!1,renderer:null,silent:!1,tokenizer:null,walkTokens:null};options=this.setOptions;parse=this.#e(ne.lex,ie.parse);parseInline=this.#e(ne.lexInline,ie.parseInline);Parser=ie;Renderer=se;TextRenderer=re;Lexer=ne;Tokenizer=w;Hooks=le;constructor(...e){this.use(...e)}walkTokens(e,t){let n=[];for(const s of e)switch(n=n.concat(t.call(this,s)),s.type){case"table":{const e=s;for(const s of e.header)n=n.concat(this.walkTokens(s.tokens,t));for(const s of e.rows)for(const e of s)n=n.concat(this.walkTokens(e.tokens,t));break}case"list":{const e=s;n=n.concat(this.walkTokens(e.items,t));break}default:{const e=s;this.defaults.extensions?.childTokens?.[e.type]?this.defaults.extensions.childTokens[e.type].forEach((s=>{const r=e[s].flat(1/0);n=n.concat(this.walkTokens(r,t))})):e.tokens&&(n=n.concat(this.walkTokens(e.tokens,t)))}}return n}use(...e){const t=this.defaults.extensions||{renderers:{},childTokens:{}};return e.forEach((e=>{const n={...e};if(n.async=this.defaults.async||n.async||!1,e.extensions&&(e.extensions.forEach((e=>{if(!e.name)throw new Error("extension name required");if("renderer"in e){const n=t.renderers[e.name];t.renderers[e.name]=n?function(...t){let s=e.renderer.apply(this,t);return!1===s&&(s=n.apply(this,t)),s}:e.renderer}if("tokenizer"in e){if(!e.level||"block"!==e.level&&"inline"!==e.level)throw new Error("extension level must be 'block' or 'inline'");const n=t[e.level];n?n.unshift(e.tokenizer):t[e.level]=[e.tokenizer],e.start&&("block"===e.level?t.startBlock?t.startBlock.push(e.start):t.startBlock=[e.start]:"inline"===e.level&&(t.startInline?t.startInline.push(e.start):t.startInline=[e.start]))}"childTokens"in e&&e.childTokens&&(t.childTokens[e.name]=e.childTokens)})),n.extensions=t),e.renderer){const t=this.defaults.renderer||new se(this.defaults);for(const n in e.renderer){if(!(n in t))throw new Error(`renderer '${n}' does not exist`);if("options"===n)continue;const s=n,r=e.renderer[s],i=t[s];t[s]=(...e)=>{let n=r.apply(t,e);return!1===n&&(n=i.apply(t,e)),n||""}}n.renderer=t}if(e.tokenizer){const t=this.defaults.tokenizer||new w(this.defaults);for(const n in e.tokenizer){if(!(n in t))throw new Error(`tokenizer '${n}' does not exist`);if(["options","rules","lexer"].includes(n))continue;const s=n,r=e.tokenizer[s],i=t[s];t[s]=(...e)=>{let n=r.apply(t,e);return!1===n&&(n=i.apply(t,e)),n}}n.tokenizer=t}if(e.hooks){const t=this.defaults.hooks||new le;for(const n in e.hooks){if(!(n in t))throw new Error(`hook '${n}' does not exist`);if("options"===n)continue;const s=n,r=e.hooks[s],i=t[s];le.passThroughHooks.has(n)?t[s]=e=>{if(this.defaults.async)return Promise.resolve(r.call(t,e)).then((e=>i.call(t,e)));const n=r.call(t,e);return i.call(t,n)}:t[s]=(...e)=>{let n=r.apply(t,e);return!1===n&&(n=i.apply(t,e)),n}}n.hooks=t}if(e.walkTokens){const t=this.defaults.walkTokens,s=e.walkTokens;n.walkTokens=function(e){let n=[];return n.push(s.call(this,e)),t&&(n=n.concat(t.call(this,e))),n}}this.defaults={...this.defaults,...n}})),this}setOptions(e){return this.defaults={...this.defaults,...e},this}lexer(e,t){return ne.lex(e,t??this.defaults)}parser(e,t){return ie.parse(e,t??this.defaults)}#e(e,t){return(n,s)=>{const r={...s},i={...this.defaults,...r};!0===this.defaults.async&&!1===r.async&&(i.silent||console.warn("marked(): The async option was set to true by an extension. The async: false option sent to parse will be ignored."),i.async=!0);const l=this.#t(!!i.silent,!!i.async);if(null==n)return l(new Error("marked(): input parameter is undefined or null"));if("string"!=typeof n)return l(new Error("marked(): input parameter is of type "+Object.prototype.toString.call(n)+", string expected"));if(i.hooks&&(i.hooks.options=i),i.async)return Promise.resolve(i.hooks?i.hooks.preprocess(n):n).then((t=>e(t,i))).then((e=>i.hooks?i.hooks.processAllTokens(e):e)).then((e=>i.walkTokens?Promise.all(this.walkTokens(e,i.walkTokens)).then((()=>e)):e)).then((e=>t(e,i))).then((e=>i.hooks?i.hooks.postprocess(e):e)).catch(l);try{i.hooks&&(n=i.hooks.preprocess(n));let s=e(n,i);i.hooks&&(s=i.hooks.processAllTokens(s)),i.walkTokens&&this.walkTokens(s,i.walkTokens);let r=t(s,i);return i.hooks&&(r=i.hooks.postprocess(r)),r}catch(e){return l(e)}}}#t(e,t){return n=>{if(n.message+="\nPlease report this to https://github.com/markedjs/marked.",e){const e="<p>An error occurred:</p><pre>"+c(n.message+"",!0)+"</pre>";return t?Promise.resolve(e):e}if(t)return Promise.reject(n);throw n}}}const ae=new oe;function ce(e,t){return ae.parse(e,t)}ce.options=ce.setOptions=function(e){return ae.setOptions(e),ce.defaults=ae.defaults,n(ce.defaults),ce},ce.getDefaults=t,ce.defaults=e.defaults,ce.use=function(...e){return ae.use(...e),ce.defaults=ae.defaults,n(ce.defaults),ce},ce.walkTokens=function(e,t){return ae.walkTokens(e,t)},ce.parseInline=ae.parseInline,ce.Parser=ie,ce.parser=ie.parse,ce.Renderer=se,ce.TextRenderer=re,ce.Lexer=ne,ce.lexer=ne.lex,ce.Tokenizer=w,ce.Hooks=le,ce.parse=ce;const he=ce.options,pe=ce.setOptions,ue=ce.use,ke=ce.walkTokens,ge=ce.parseInline,fe=ce,de=ie.parse,xe=ne.lex;e.Hooks=le,e.Lexer=ne,e.Marked=oe,e.Parser=ie,e.Renderer=se,e.TextRenderer=re,e.Tokenizer=w,e.getDefaults=t,e.lexer=xe,e.marked=ce,e.options=he,e.parse=fe,e.parseInline=ge,e.parser=de,e.setOptions=pe,e.use=ue,e.walkTokens=ke}));
 
 </script>
+
 <script>
 (function () {
   "use strict";
 
-  marked.setOptions({ gfm: true, breaks: false });
+  var SETTINGS_KEY = "mdv_settings_v2";
+  var TOC_WIDTH_KEY = "mdv_toc_width_v1";
+  var DEFAULTS = { theme: "github", font: "auto", size: 16, tooltips: true, wrapCode: false };
+
+  var SANS = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif';
+  var SERIF = 'Georgia, "Times New Roman", "Noto Serif", Charter, serif';
+  var HUMANIST = 'Candara, "Segoe UI", Tahoma, "Trebuchet MS", sans-serif';
+  var MONO = 'ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, "Courier New", monospace';
+
+  var FONTS = [
+    { id: "auto", name: "Из темы" },
+    { id: "sans", name: "Системный (Segoe UI)", css: SANS },
+    { id: "serif", name: "С засечками (Georgia)", css: SERIF },
+    { id: "humanist", name: "Гуманистический (Candara)", css: HUMANIST },
+    { id: "mono", name: "Моноширинный", css: MONO }
+  ];
+
+  // Тема = палитра цветов + рекомендуемый шрифт (как пресеты на markdownviewer.org)
+  var THEMES = [
+    { id: "github", name: "GitHub", scheme: "light", desc: "Классическое оформление GitHub", sw: "#ffffff", swa: "#0969da", fontBody: SANS, fontHead: SANS,
+      vars: { "bg": "#ffffff", "panel": "#ffffff", "panel-2": "#f6f8fa", "fg": "#1f2328", "muted": "#59636e", "border": "#d1d9e0", "accent": "#0969da", "accent-2": "#218bff", "accent-soft": "#ddf4ff", "code-bg": "#f6f8fa", "head-bg": "#f6f8fa", "top-bg": "#24292f", "top-fg": "#ffffff", "grid": "#d7dee8", "shadow": "0 10px 30px rgba(31,35,40,.12)", "shadow-sm": "0 2px 8px rgba(31,35,40,.10)", "tip-bg": "#1f2328", "tip-fg": "#ffffff" } },
+    { id: "medium", name: "Medium", scheme: "light", desc: "Серифный текст, жирные заголовки без засечек, пунктирные разделители", sw: "#ffffff", swa: "#1a8917", fontBody: SERIF, fontHead: SANS,
+      vars: { "bg": "#ffffff", "panel": "#ffffff", "panel-2": "#f7f4ed", "fg": "#242424", "muted": "#6b6b6b", "border": "#e6e6e6", "accent": "#1a8917", "accent-2": "#156d12", "accent-soft": "#e8f5e9", "code-bg": "#f5f5f5", "head-bg": "#fafafa", "top-bg": "#191919", "top-fg": "#ffffff", "grid": "#e6e6e6", "shadow": "0 10px 30px rgba(36,36,36,.12)", "shadow-sm": "0 2px 8px rgba(36,36,36,.10)", "tip-bg": "#242424", "tip-fg": "#ffffff" } },
+    { id: "notion", name: "Notion", scheme: "light", desc: "Компактные блоки без засечек, тонкие разделители", sw: "#ffffff", swa: "#2383e2", fontBody: SANS, fontHead: SANS,
+      vars: { "bg": "#ffffff", "panel": "#ffffff", "panel-2": "#f7f6f3", "fg": "#37352f", "muted": "#787774", "border": "#e9e9e7", "accent": "#2383e2", "accent-2": "#1b6dc1", "accent-soft": "#eef4fb", "code-bg": "#f7f6f3", "head-bg": "#f7f6f3", "top-bg": "#ffffff", "top-fg": "#37352f", "grid": "#e9e9e7", "shadow": "0 10px 30px rgba(55,53,47,.12)", "shadow-sm": "0 2px 8px rgba(55,53,47,.10)", "tip-bg": "#37352f", "tip-fg": "#ffffff" } },
+    { id: "substack", name: "Substack", scheme: "light", desc: "Серифный текст рассылки с оранжевым подчёркиванием ссылок", sw: "#ffffff", swa: "#ff6719", fontBody: SERIF, fontHead: SERIF,
+      vars: { "bg": "#ffffff", "panel": "#ffffff", "panel-2": "#faf9f6", "fg": "#292929", "muted": "#6b6b6b", "border": "#e8e6e0", "accent": "#ff6719", "accent-2": "#e05a12", "accent-soft": "#fff0e8", "code-bg": "#f6f5f2", "head-bg": "#faf9f6", "top-bg": "#ffffff", "top-fg": "#292929", "grid": "#e8e6e0", "shadow": "0 10px 30px rgba(41,41,41,.12)", "shadow-sm": "0 2px 8px rgba(41,41,41,.10)", "tip-bg": "#292929", "tip-fg": "#ffffff" } },
+    { id: "serif-classic", name: "Serif Classic", scheme: "light", desc: "Georgia с выравниванием по ширине", sw: "#fbf7ef", swa: "#8a5a2b", fontBody: SERIF, fontHead: SERIF,
+      vars: { "bg": "#fbf7ef", "panel": "#fffdf8", "panel-2": "#f5efe3", "fg": "#3b3629", "muted": "#7a6f5d", "border": "#e3d9c6", "accent": "#8a5a2b", "accent-2": "#6f4520", "accent-soft": "#f0e6d4", "code-bg": "#f3ecdd", "head-bg": "#f5efe3", "top-bg": "#3b3629", "top-fg": "#fffdf8", "grid": "#e3d9c6", "shadow": "0 10px 30px rgba(59,54,41,.16)", "shadow-sm": "0 2px 8px rgba(59,54,41,.12)", "tip-bg": "#3b3629", "tip-fg": "#fffdf8" } },
+    { id: "modern-sans", name: "Modern Sans", scheme: "light", desc: "Чистый шрифт без засечек с воздушными отступами", sw: "#f6f8fb", swa: "#2563eb", fontBody: SANS, fontHead: SANS,
+      vars: { "bg": "#f6f8fb", "panel": "#ffffff", "panel-2": "#fbfcfe", "fg": "#0f172a", "muted": "#64748b", "border": "#e2e8f0", "accent": "#2563eb", "accent-2": "#3b82f6", "accent-soft": "#eef4ff", "code-bg": "#f8fafc", "head-bg": "#f1f5f9", "top-bg": "#0f172a", "top-fg": "#ffffff", "grid": "#e2e8f0", "shadow": "0 10px 30px rgba(15,23,42,.12)", "shadow-sm": "0 2px 8px rgba(15,23,42,.10)", "tip-bg": "#0f172a", "tip-fg": "#ffffff" } },
+    { id: "mint", name: "Eye-care Mint", scheme: "light", desc: "Мягкий бледно-зелёный фон для долгого чтения", sw: "#eaf4ec", swa: "#2f9e6e", fontBody: SANS, fontHead: SANS,
+      vars: { "bg": "#eaf4ec", "panel": "#f6fbf7", "panel-2": "#eef7f0", "fg": "#1f2d22", "muted": "#5a6b5e", "border": "#cfe3d4", "accent": "#2f9e6e", "accent-2": "#278a5f", "accent-soft": "#d9efe2", "code-bg": "#e8f3ea", "head-bg": "#e2f0e6", "top-bg": "#1f3a2a", "top-fg": "#eaf7ee", "grid": "#cfe3d4", "shadow": "0 10px 30px rgba(31,45,34,.14)", "shadow-sm": "0 2px 8px rgba(31,45,34,.10)", "tip-bg": "#1f2d22", "tip-fg": "#eaf7ee" } },
+    { id: "midnight", name: "Midnight Dark", scheme: "dark", desc: "Глубокий тёмно-синий фон с чёткой типографикой", sw: "#0b1120", swa: "#60a5fa", fontBody: SANS, fontHead: SANS,
+      vars: { "bg": "#0b1120", "panel": "#111a2e", "panel-2": "#0e1626", "fg": "#e6edf7", "muted": "#94a3b8", "border": "#22304a", "accent": "#60a5fa", "accent-2": "#93c5fd", "accent-soft": "#172554", "code-bg": "#0d1524", "head-bg": "#142036", "top-bg": "#070c18", "top-fg": "#e6edf7", "grid": "#1c2a44", "shadow": "0 12px 34px rgba(0,0,0,.45)", "shadow-sm": "0 2px 10px rgba(0,0,0,.35)", "tip-bg": "#e6edf7", "tip-fg": "#0b1120" } },
+    { id: "nord", name: "Nord Slate", scheme: "dark", desc: "Прохладная арктическая палитра в духе Nord", sw: "#242933", swa: "#88c0d0", fontBody: SANS, fontHead: SANS,
+      vars: { "bg": "#242933", "panel": "#2e3440", "panel-2": "#292e3a", "fg": "#e5e9f0", "muted": "#a3abbc", "border": "#3b4252", "accent": "#88c0d0", "accent-2": "#8fbcbb", "accent-soft": "#3b4252", "code-bg": "#272c36", "head-bg": "#333a47", "top-bg": "#1c2028", "top-fg": "#eceff4", "grid": "#39404e", "shadow": "0 12px 34px rgba(0,0,0,.38)", "shadow-sm": "0 2px 10px rgba(0,0,0,.28)", "tip-bg": "#e5e9f0", "tip-fg": "#2e3440" } },
+    { id: "solarized-light", name: "Solarized Light", scheme: "light", desc: "Тёплая кремово-жёлтая палитра Solarized", sw: "#fdf6e3", swa: "#268bd2", fontBody: SANS, fontHead: SANS,
+      vars: { "bg": "#fdf6e3", "panel": "#fdf6e3", "panel-2": "#eee8d5", "fg": "#586e75", "muted": "#839496", "border": "#d9d2bd", "accent": "#268bd2", "accent-2": "#2aa198", "accent-soft": "#e0ecf0", "code-bg": "#eee8d5", "head-bg": "#eee8d5", "top-bg": "#073642", "top-fg": "#fdf6e3", "grid": "#d9d2bd", "shadow": "0 10px 30px rgba(88,110,117,.16)", "shadow-sm": "0 2px 8px rgba(88,110,117,.12)", "tip-bg": "#073642", "tip-fg": "#fdf6e3" } },
+    { id: "solarized-dark", name: "Solarized Dark", scheme: "dark", desc: "Тёмный цианово-синий фон с мягкой бирюзой", sw: "#002b36", swa: "#2aa198", fontBody: SANS, fontHead: SANS,
+      vars: { "bg": "#002b36", "panel": "#002b36", "panel-2": "#073642", "fg": "#93a1a1", "muted": "#657b83", "border": "#0f4b5a", "accent": "#2aa198", "accent-2": "#268bd2", "accent-soft": "#073642", "code-bg": "#073642", "head-bg": "#073642", "top-bg": "#00212b", "top-fg": "#eee8d5", "grid": "#0f4b5a", "shadow": "0 12px 34px rgba(0,0,0,.4)", "shadow-sm": "0 2px 10px rgba(0,0,0,.3)", "tip-bg": "#eee8d5", "tip-fg": "#002b36" } },
+    { id: "dracula", name: "Dracula", scheme: "dark", desc: "Контрастная тёмная тема с фиолетовыми и розовыми акцентами", sw: "#282a36", swa: "#bd93f9", fontBody: SANS, fontHead: SANS,
+      vars: { "bg": "#282a36", "panel": "#282a36", "panel-2": "#21222c", "fg": "#f8f8f2", "muted": "#a8a8b3", "border": "#44475a", "accent": "#bd93f9", "accent-2": "#ff79c6", "accent-soft": "#3b3654", "code-bg": "#21222c", "head-bg": "#343746", "top-bg": "#1d1e26", "top-fg": "#f8f8f2", "grid": "#44475a", "shadow": "0 12px 34px rgba(0,0,0,.45)", "shadow-sm": "0 2px 10px rgba(0,0,0,.35)", "tip-bg": "#f8f8f2", "tip-fg": "#282a36" } }
+  ];
+
+  function themeById(id) {
+    for (var i = 0; i < THEMES.length; i++) { if (THEMES[i].id === id) { return THEMES[i]; } }
+    return THEMES[0];
+  }
+
+  function mermaidVarsFor(t) {
+    var v = t.vars;
+    return {
+      background: v["panel"], mainBkg: v["accent-soft"], primaryColor: v["accent-soft"],
+      primaryTextColor: v["fg"], primaryBorderColor: v["accent"],
+      secondaryColor: v["panel-2"], secondaryTextColor: v["fg"], secondaryBorderColor: v["accent-2"],
+      tertiaryColor: v["panel"], tertiaryTextColor: v["fg"], tertiaryBorderColor: v["border"],
+      lineColor: v["muted"], textColor: v["fg"], nodeTextColor: v["fg"],
+      edgeLabelBackground: v["panel"], clusterBkg: v["panel-2"], clusterBorder: v["border"],
+      titleColor: v["fg"], actorBkg: v["accent-soft"], actorBorder: v["accent"], actorTextColor: v["fg"],
+      signalColor: v["muted"], signalTextColor: v["fg"], labelBoxBkgColor: v["accent-soft"],
+      labelBoxBorderColor: v["accent"], labelTextColor: v["fg"], loopTextColor: v["fg"],
+      noteBkgColor: v["code-bg"], noteBorderColor: v["accent-2"], noteTextColor: v["fg"],
+      fontFamily: "inherit"
+    };
+  }
 
   var fileInput = document.getElementById("file-input");
   var dropbar = document.getElementById("dropbar");
@@ -401,122 +801,241 @@
   var content = document.getElementById("content");
   var toc = document.getElementById("toc");
   var overlay = document.getElementById("overlay");
-  var dragDepth = 0;
-
+  var layout = document.getElementById("layout");
   var splitter = document.getElementById("splitter");
-  var layout = document.querySelector(".layout");
   var tocToggle = document.getElementById("toc-toggle");
+  var tocTopToggle = document.getElementById("toc-top-toggle");
+  var settingsBtn = document.getElementById("settings-btn");
+  var settingsPop = document.getElementById("settings-pop");
+  var settingsClose = document.getElementById("settings-close");
+  var themeGrid = document.getElementById("theme-grid");
+  var fontSelect = document.getElementById("font-select");
+  var sizeRange = document.getElementById("size-range");
+  var sizeVal = document.getElementById("size-val");
+  var tipCheck = document.getElementById("tip-check");
+  var wrapCheck = document.getElementById("wrap-check");
+  var settingsReset = document.getElementById("settings-reset");
+  var nodeTip = document.getElementById("node-tip");
+  var toastEl = document.getElementById("toast");
+  var dragDepth = 0;
   var draggingSplitter = false;
+  var tocWidth = 280;
+  var lastOpenWidth = 280;
+  var MIN_OPEN_WIDTH = 180;
+  var SNAP_TO_ZERO = 70;
+  var MAX_TOC_WIDTH = 560;
+  var DEFAULT_TOC_WIDTH = 280;
+  var mermaidRetries = 0;
+  var mermaidCounter = 0;
+  var rerenderTimer = null;
+  var tipTimer = null;
 
-  var DEFAULT_TOC_WIDTH = 260;
-  var MIN_OPEN_WIDTH = 160;
-  var SNAP_TO_ZERO = 60;
-  var MAX_TOC_WIDTH = 620;
-  var tocWidth = DEFAULT_TOC_WIDTH;
-  var lastOpenWidth = DEFAULT_TOC_WIDTH;
+  marked.setOptions({ gfm: true, breaks: false });
 
+  /* ---------- настройки ---------- */
+  function loadSettings() {
+    var s = {};
+    try {
+      s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") || {};
+    } catch (e) { s = {}; }
+    var out = {};
+    Object.keys(DEFAULTS).forEach(function (k) {
+      out[k] = (s[k] === undefined) ? DEFAULTS[k] : s[k];
+    });
+    var known = THEMES.some(function (t) { return t.id === out.theme; });
+    if (!known) { out.theme = DEFAULTS.theme; }
+    var knownFont = FONTS.some(function (f) { return f.id === out.font; });
+    if (!knownFont) { out.font = DEFAULTS.font; }
+    return out;
+  }
+  var settings = loadSettings();
+
+  function saveSettings() {
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {}
+  }
+
+  function buildThemeButtons() {
+    THEMES.forEach(function (t) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "theme-btn";
+      btn.setAttribute("data-theme-id", t.id);
+      btn.title = t.desc;
+      btn.innerHTML = '<span class="sw" style="background:' + t.sw + ';border-color:' + t.swa + '"></span><span>' + t.name + "</span>";
+      btn.addEventListener("click", function () {
+        settings.theme = t.id;
+        saveSettings();
+        applySettings(true);
+      });
+      themeGrid.appendChild(btn);
+    });
+  }
+
+  function syncSettingsControls() {
+    Array.prototype.forEach.call(themeGrid.querySelectorAll(".theme-btn"), function (btn) {
+      btn.setAttribute("aria-pressed", btn.getAttribute("data-theme-id") === settings.theme ? "true" : "false");
+    });
+    fontSelect.value = settings.font;
+    sizeRange.value = String(settings.size);
+    sizeVal.textContent = settings.size + " px";
+    tipCheck.checked = !!settings.tooltips;
+    wrapCheck.checked = !!settings.wrapCode;
+  }
+
+  function applySettings(rerenderDiagrams) {
+    var t = themeById(settings.theme);
+    var root = document.documentElement;
+    var v = t.vars;
+    Object.keys(v).forEach(function (k) {
+      root.style.setProperty("--" + k, v[k]);
+    });
+    var font = FONTS.some(function (f) { return f.id === settings.font && f.id !== "auto"; })
+      ? (FONTS.filter(function (f) { return f.id === settings.font; })[0].css)
+      : t.fontBody;
+    var headFont = (settings.font === "auto") ? (t.fontHead || t.fontBody) : font;
+    root.style.setProperty("--font-body", font);
+    root.style.setProperty("--font-head", headFont);
+    root.setAttribute("data-theme", t.id);
+    root.setAttribute("data-scheme", t.scheme);
+    document.documentElement.style.setProperty("--font-size", settings.size + "px");
+    document.body.classList.toggle("wrap-code", !!settings.wrapCode);
+    if (!settings.tooltips) { hideNodeTip(); }
+    syncSettingsControls();
+    if (rerenderDiagrams) { scheduleMermaidRerender(); }
+  }
+
+  function scheduleMermaidRerender() {
+    if (rerenderTimer) { clearTimeout(rerenderTimer); }
+    rerenderTimer = setTimeout(function () {
+      rerenderTimer = null;
+      rerenderAllMermaid();
+    }, 220);
+  }
+
+  /* ---------- верхние кнопки ---------- */
+  document.getElementById("open-btn").addEventListener("click", function () { fileInput.click(); });
+
+  function openSettings() {
+    settingsPop.classList.add("open");
+    settingsBtn.setAttribute("aria-expanded", "true");
+  }
+  function closeSettings() {
+    settingsPop.classList.remove("open");
+    settingsBtn.setAttribute("aria-expanded", "false");
+  }
+  settingsBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    if (settingsPop.classList.contains("open")) { closeSettings(); } else { openSettings(); }
+  });
+  settingsClose.addEventListener("click", closeSettings);
+  document.addEventListener("click", function (e) {
+    if (settingsPop.classList.contains("open") && !e.target.closest(".menu-wrap")) { closeSettings(); }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { closeSettings(); hideNodeTip(); }
+  });
+
+  fontSelect.addEventListener("change", function () {
+    settings.font = fontSelect.value;
+    saveSettings();
+    applySettings(true);
+  });
+  sizeRange.addEventListener("input", function () {
+    settings.size = parseInt(sizeRange.value, 10) || 16;
+    saveSettings();
+    applySettings(false);
+    sizeVal.textContent = settings.size + " px";
+    scheduleMermaidRerender();
+  });
+  tipCheck.addEventListener("change", function () {
+    settings.tooltips = tipCheck.checked;
+    saveSettings();
+    if (!settings.tooltips) { hideNodeTip(); }
+  });
+  wrapCheck.addEventListener("change", function () {
+    settings.wrapCode = wrapCheck.checked;
+    saveSettings();
+    applySettings(false);
+  });
+  settingsReset.addEventListener("click", function () {
+    settings = Object.assign({}, DEFAULTS);
+    saveSettings();
+    applySettings(true);
+  });
+
+  /* ---------- оглавление и ширина ---------- */
   function applyTocWidth(width) {
     width = Math.round(width);
     width = Math.max(0, Math.min(MAX_TOC_WIDTH, width));
-    // «магнит»: чуть-чуть не дотянули до нуля - закрываем полностью,
-    // а слишком узкое, но не нулевое оглавление не оставляем
-    if (width > 0 && width < SNAP_TO_ZERO) {
-      width = 0;
-    } else if (width > 0 && width < MIN_OPEN_WIDTH) {
-      width = MIN_OPEN_WIDTH;
-    }
+    if (width > 0 && width < SNAP_TO_ZERO) { width = 0; }
+    else if (width > 0 && width < MIN_OPEN_WIDTH) { width = MIN_OPEN_WIDTH; }
     tocWidth = width;
     layout.style.setProperty("--toc-width", width + "px");
-
     var collapsed = width === 0;
     layout.classList.toggle("toc-collapsed", collapsed);
     toc.setAttribute("aria-hidden", collapsed ? "true" : "false");
-    if (!collapsed) {
-      lastOpenWidth = width;
-    }
+    if (!collapsed) { lastOpenWidth = width; }
     updateTocToggle(collapsed);
   }
-
   function updateTocToggle(collapsed) {
     tocToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
     var text = collapsed ? "Показать оглавление" : "Скрыть оглавление";
     tocToggle.title = text;
     tocToggle.setAttribute("aria-label", text);
-    tocToggle.querySelector(".icon").textContent = collapsed ? "☰" : "«";
-  }
-
-  function toggleToc() {
-    if (tocWidth === 0) {
-      applyTocWidth(lastOpenWidth || DEFAULT_TOC_WIDTH);
-    } else {
-      applyTocWidth(0);
+    tocToggle.querySelector(".icon").textContent = collapsed ? "\u2630" : "\u00ab";
+    if (tocTopToggle) {
+      tocTopToggle.setAttribute("aria-pressed", collapsed ? "false" : "true");
+      tocTopToggle.textContent = collapsed ? "Показать оглавление" : "Скрыть оглавление";
+      tocTopToggle.title = collapsed ? "Показать оглавление" : "Скрыть оглавление";
     }
   }
-
+  function toggleToc() {
+    if (tocWidth === 0) { applyTocWidth(lastOpenWidth || DEFAULT_TOC_WIDTH); }
+    else { applyTocWidth(0); }
+  }
   tocToggle.addEventListener("click", toggleToc);
-
+  tocTopToggle.addEventListener("click", toggleToc);
   splitter.addEventListener("pointerdown", function (e) {
     e.preventDefault();
     draggingSplitter = true;
     splitter.classList.add("dragging");
     document.body.classList.add("dragging");
+    if (splitter.setPointerCapture) { try { splitter.setPointerCapture(e.pointerId); } catch (err) {} }
   });
-
   window.addEventListener("pointermove", function (e) {
-    if (!draggingSplitter) {
-      return;
-    }
-    var width = e.clientX - layout.getBoundingClientRect().left;
-    applyTocWidth(width);
+    if (!draggingSplitter) { return; }
+    applyTocWidth(e.clientX - layout.getBoundingClientRect().left);
   });
-
   window.addEventListener("pointerup", function () {
-    if (!draggingSplitter) {
-      return;
-    }
+    if (!draggingSplitter) { return; }
     draggingSplitter = false;
     splitter.classList.remove("dragging");
     document.body.classList.remove("dragging");
+    try { localStorage.setItem(TOC_WIDTH_KEY, String(tocWidth)); } catch (e) {}
   });
+  splitter.addEventListener("dblclick", function () { applyTocWidth(DEFAULT_TOC_WIDTH); });
 
-  applyTocWidth(DEFAULT_TOC_WIDTH);
+  var savedToc = 0;
+  try { savedToc = parseInt(localStorage.getItem(TOC_WIDTH_KEY) || "0", 10) || 0; } catch (e) { savedToc = 0; }
+  applyTocWidth(savedToc > 0 ? savedToc : DEFAULT_TOC_WIDTH);
 
-  // переключение иконки полноэкранной кнопки
-  document.addEventListener("fullscreenchange", function () {
-    var fs = document.fullscreenElement;
-    var btns = document.querySelectorAll('[data-act="fullscreen"]');
-    Array.prototype.forEach.call(btns, function (b) {
-      b.textContent = fs ? "✕" : "⛶";
-      b.title = fs ? "Выйти из полноэкранного режима" : "На весь экран";
-    });
-  });
-
-  // --- клик по панели открывает диалог выбора файла ---
-  dropbar.addEventListener("click", function () {
-    fileInput.click();
-  });
+  /* ---------- файл ---------- */
+  dropbar.addEventListener("click", function () { fileInput.click(); });
   dropbar.addEventListener("keydown", function (e) {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      fileInput.click();
-    }
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); }
   });
-
   fileInput.addEventListener("change", function () {
     handleFiles(fileInput.files);
-    fileInput.value = ""; // чтобы можно было выбрать тот же файл повторно
+    fileInput.value = "";
   });
 
-  // --- drag & drop на всё окно ---
   window.addEventListener("dragenter", function (e) {
     e.preventDefault();
     dragDepth++;
     overlay.classList.add("visible");
     dropbar.classList.add("drag");
   });
-  window.addEventListener("dragover", function (e) {
-    e.preventDefault();
-  });
+  window.addEventListener("dragover", function (e) { e.preventDefault(); });
   window.addEventListener("dragleave", function (e) {
     e.preventDefault();
     dragDepth--;
@@ -537,36 +1056,32 @@
   });
 
   function handleFiles(files) {
-    if (!files || !files.length) {
-      return;
-    }
+    if (!files || !files.length) { return; }
     var file = files[0];
     var name = file.name || "файл";
     fileName.textContent = files.length > 1 ? (files.length + " файлов, открыт: " + name) : name;
-    if (name.indexOf(".md") === -1 && name.indexOf(".markdown") === -1 && name.indexOf(".txt") === -1) {
-      content.innerHTML = '<div class="empty"><div class="big">Не похоже на Markdown</div>'
-        + "<p>Выбранный файл: " + escapeHtml(name) + "</p>"
-        + "<p>Поддерживаются .md, .markdown и .txt - но можно попробовать открыть и этот.</p></div>";
-    }
-    readFile(file, function (text) {
-      render(text);
-    });
+    readFile(file, function (text) { render(text); });
   }
-
   function readFile(file, cb) {
     var reader = new FileReader();
-    reader.onload = function () {
-      cb(String(reader.result || ""));
-    };
+    reader.onload = function () { cb(String(reader.result || "")); };
     reader.onerror = function () {
       content.innerHTML = '<div class="empty"><div class="big">Не удалось прочитать файл</div></div>';
     };
     reader.readAsText(file, "utf-8");
   }
 
+  /* ---------- рендер markdown ---------- */
   function render(text) {
     content.innerHTML = marked.parse(text);
+    dropbar.classList.add("hidden");
+    buildToc();
+    renderMermaidBlocks();
+    addCodeCopyButtons();
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }
 
+  function buildToc() {
     var headings = content.querySelectorAll("h1, h2, h3");
     var items = [];
     for (var i = 0; i < headings.length; i++) {
@@ -574,57 +1089,80 @@
       var id = "sec-" + i;
       h.id = id;
       var cls = "lvl-" + h.tagName.charAt(1);
-      items.push('<a class="' + cls + '" href="#' + id + '">' + escapeHtml(h.textContent) + '</a>');
+      items.push('<a class="' + cls + '" href="#' + id + '">' + escapeHtml(h.textContent) + "</a>");
     }
     toc.innerHTML = items.join("");
-
-    renderMermaid();
-    addCodeCopyButtons();
   }
 
-  var mermaidInitialized = false;
-  var mermaidRetries = 0;
+  /* ---------- mermaid ---------- */
+  function mermaidConfig() {
+    return {
+      startOnLoad: false,
+      securityLevel: "loose",
+      theme: "base",
+      fontFamily: getComputedStyle(document.body).fontFamily,
+      flowchart: {
+        htmlLabels: true,
+        wrappingWidth: 190,
+        useMaxWidth: false,
+        nodeSpacing: 34,
+        rankSpacing: 46,
+        padding: 8,
+        subGraphTitleMargin: { top: 24, bottom: 8 }
+      },
+      sequence: { useMaxWidth: false },
+      gantt: { useMaxWidth: false },
+      journey: { useMaxWidth: false },
+      class: { useMaxWidth: false },
+      state: { useMaxWidth: false },
+      er: { useMaxWidth: false },
+      themeVariables: mermaidVarsFor(themeById(settings.theme))
+    };
+  }
 
-  function renderMermaid() {
+  function renderMermaidBlocks() {
     var blocks = content.querySelectorAll("pre code.language-mermaid");
-    if (!blocks.length) {
-      return;
-    }
-    // CDN ещё не загрузился - подождём немного (до ~6 секунд)
+    if (!blocks.length) { return; }
     if (typeof mermaid === "undefined") {
-      if (mermaidRetries++ < 20) {
-        setTimeout(renderMermaid, 300);
+      if (mermaidRetries++ < 25) {
+        setTimeout(renderMermaidBlocks, 300);
       } else {
         markMermaidUnavailable(blocks);
       }
       return;
     }
-    if (!mermaidInitialized) {
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: "default",
-        flowchart: {
-          nodeSpacing: 60,
-          rankSpacing: 60,
-          padding: 12,
-          subGraphTitleMargin: { top: 80, bottom: 10 }
-        }
-      });
-      mermaidInitialized = true;
-    }
-    var idx = 0;
+    mermaid.initialize(mermaidConfig());
     Array.prototype.forEach.call(blocks, function (code) {
       var pre = code.parentNode;
-      var source = code.textContent;
-      var id = "mmd-" + (++idx) + "-" + Date.now().toString(36);
-      Promise.resolve(mermaid.render(id, source)).then(function (result) {
-        var box = buildMermaidBox(result.svg, source);
-        if (pre.parentNode) {
-          pre.parentNode.replaceChild(box, pre);
-        }
-      }).catch(function (err) {
-        showMermaidError(pre, err);
-      });
+      renderMermaidOne(code.textContent, null, pre);
+    });
+  }
+
+  function renderMermaidOne(source, replaceBox, pre) {
+    var id = "mmd-" + (++mermaidCounter) + "-" + Date.now().toString(36);
+    Promise.resolve(mermaid.render(id, source)).then(function (result) {
+      var box = buildMermaidBox(result.svg, source);
+      if (replaceBox && replaceBox.parentNode) {
+        replaceBox.parentNode.replaceChild(box, replaceBox);
+      } else if (pre && pre.parentNode) {
+        pre.parentNode.replaceChild(box, pre);
+      }
+      sizeMermaidViewport(box);
+      fitMermaid(box);
+    }).catch(function (err) {
+      if (pre) { showMermaidError(pre, err); }
+    });
+  }
+
+  function rerenderAllMermaid() {
+    if (typeof mermaid === "undefined") { return; }
+    var boxes = content.querySelectorAll(".mermaid-box");
+    if (!boxes.length) { return; }
+    mermaid.initialize(mermaidConfig());
+    Array.prototype.forEach.call(boxes, function (box) {
+      var source = box._mermaidSource || "";
+      if (!source) { return; }
+      renderMermaidOne(source, box, null);
     });
   }
 
@@ -644,12 +1182,255 @@
     });
   }
 
+  function buildMermaidBox(svg, source) {
+    var box = document.createElement("div");
+    box.className = "mermaid-box";
+    box._scale = 1;
+    box._mermaidSource = source || "";
+    box.innerHTML =
+      '<div class="mermaid-toolbar">' +
+        '<button type="button" data-act="zoom-out" title="Отдалить">-</button>' +
+        '<button type="button" data-act="zoom-reset" class="pct" title="Сбросить масштаб (100%)">100%</button>' +
+        '<button type="button" data-act="zoom-in" title="Приблизить">+</button>' +
+        '<button type="button" data-act="fit" title="Вписать диаграмму в блок">Вписать</button>' +
+        '<button type="button" data-act="fullscreen" title="На весь экран">\u26f6</button>' +
+        '<span class="sep"></span>' +
+        '<button type="button" data-act="copy-png" title="Скопировать как PNG">PNG</button>' +
+        '<button type="button" data-act="copy-svg" title="Скопировать как SVG">SVG</button>' +
+        '<button type="button" data-act="copy-mmd" title="Скопировать исходник Mermaid">Mermaid</button>' +
+        '<span class="hint">колесо с Ctrl - зум, перетаскивание - панорама</span>' +
+      "</div>" +
+      '<div class="mermaid-viewport"><div class="mermaid-inner">' + svg + "</div></div>";
+
+    normalizeSvg(box);
+    decorateNodes(box);
+    bindToolbar(box);
+    bindPanning(box);
+    bindNodeTips(box);
+    return box;
+  }
+
+  function normalizeSvg(box) {
+    var svg = box.querySelector("svg");
+    if (!svg) { return; }
+    var vb = svg.viewBox && svg.viewBox.baseVal;
+    if (vb && vb.width && vb.height) {
+      svg.setAttribute("width", vb.width);
+      svg.setAttribute("height", vb.height);
+    }
+    svg.style.maxWidth = "none";
+  }
+
+  function naturalSize(box) {
+    var svg = box.querySelector("svg");
+    if (!svg) { return { w: 800, h: 600 }; }
+    var vb = svg.viewBox && svg.viewBox.baseVal;
+    if (vb && vb.width && vb.height) { return { w: vb.width, h: vb.height }; }
+    return {
+      w: parseFloat(svg.getAttribute("width")) || 800,
+      h: parseFloat(svg.getAttribute("height")) || 600
+    };
+  }
+
+  function sizeMermaidViewport(box) {
+    var vp = box.querySelector(".mermaid-viewport");
+    if (!vp) { return; }
+    var n = naturalSize(box);
+    var maxH = Math.max(300, Math.min(520, Math.round(window.innerHeight * 0.56)));
+    var h = Math.max(240, Math.min(maxH, n.h + 40));
+    vp.style.height = h + "px";
+  }
+
+  function applyMermaidScale(box) {
+    var inner = box.querySelector(".mermaid-inner");
+    if (!inner) { return; }
+    inner.style.zoom = box._scale;
+    var btn = box.querySelector('[data-act="zoom-reset"]');
+    if (btn) { btn.textContent = Math.round(box._scale * 100) + "%"; }
+  }
+
+  function fitMermaid(box) {
+    var vp = box.querySelector(".mermaid-viewport");
+    if (!vp) { return; }
+    var n = naturalSize(box);
+    var sx = (vp.clientWidth - 34) / n.w;
+    var sy = (vp.clientHeight - 34) / n.h;
+    box._scale = Math.max(0.08, Math.min(1, Math.min(sx, sy)));
+    box._atFit = true;
+    applyMermaidScale(box);
+    vp.scrollLeft = Math.max(0, (vp.scrollWidth - vp.clientWidth) / 2);
+    vp.scrollTop = Math.max(0, (vp.scrollHeight - vp.clientHeight) / 2);
+  }
+
+  function handleMermaidAction(box, act) {
+    if (act === "zoom-in") {
+      box._scale = Math.min(8, box._scale * 1.25);
+      box._atFit = false;
+      applyMermaidScale(box);
+    } else if (act === "zoom-out") {
+      box._scale = Math.max(0.08, box._scale / 1.25);
+      box._atFit = false;
+      applyMermaidScale(box);
+    } else if (act === "zoom-reset") {
+      box._scale = 1;
+      box._atFit = false;
+      applyMermaidScale(box);
+    } else if (act === "fit") {
+      fitMermaid(box);
+    } else if (act === "fullscreen") {
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(function () {});
+      } else if (box.requestFullscreen) {
+        box.requestFullscreen().catch(function () { toast("Не удалось открыть на весь экран"); });
+      }
+    } else if (act === "copy-png") {
+      svgToPngBlob(box.querySelector("svg"), function (blob) {
+        if (blob) { copyPng(blob); } else { toast("Не удалось подготовить PNG"); }
+      });
+    } else if (act === "copy-svg") {
+      copyText(new XMLSerializer().serializeToString(box.querySelector("svg")), "SVG скопирован в буфер");
+    } else if (act === "copy-mmd") {
+      copyText(box._mermaidSource || "", "Код Mermaid скопирован в буфер");
+    }
+  }
+
+  function bindToolbar(box) {
+    box.querySelector(".mermaid-toolbar").addEventListener("click", function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest("button[data-act]") : null;
+      if (!btn) { return; }
+      handleMermaidAction(box, btn.getAttribute("data-act"));
+    });
+  }
+
+  function bindPanning(box) {
+    var vp = box.querySelector(".mermaid-viewport");
+    var state = null;
+    vp.addEventListener("pointerdown", function (e) {
+      if (e.button !== 0) { return; }
+      state = { x: e.clientX, y: e.clientY, sl: vp.scrollLeft, st: vp.scrollTop, moved: false };
+      vp.classList.add("panning");
+      if (vp.setPointerCapture) { try { vp.setPointerCapture(e.pointerId); } catch (err) {} }
+      e.preventDefault();
+    });
+    vp.addEventListener("pointermove", function (e) {
+      if (!state) { return; }
+      var dx = e.clientX - state.x;
+      var dy = e.clientY - state.y;
+      if (!state.moved && Math.abs(dx) + Math.abs(dy) < 4) { return; }
+      state.moved = true;
+      vp.scrollLeft = state.sl - dx;
+      vp.scrollTop = state.st - dy;
+    });
+    function endPan() {
+      state = null;
+      vp.classList.remove("panning");
+    }
+    vp.addEventListener("pointerup", endPan);
+    vp.addEventListener("pointercancel", endPan);
+    vp.addEventListener("dblclick", function () { fitMermaid(box); });
+    vp.addEventListener("wheel", function (e) {
+      if (!e.ctrlKey) { return; }
+      e.preventDefault();
+      box._atFit = false;
+      if (e.deltaY < 0) { box._scale = Math.min(8, box._scale * 1.15); }
+      else { box._scale = Math.max(0.08, box._scale / 1.15); }
+      applyMermaidScale(box);
+    }, { passive: false });
+  }
+
+  /* ---------- полный текст узла при наведении ---------- */
+  function nodeLabelText(g) {
+    var label = g.querySelector(".nodeLabel");
+    if (label) {
+      var clone = label.cloneNode(true);
+      Array.prototype.forEach.call(clone.querySelectorAll("br"), function (br) {
+        br.parentNode.replaceChild(document.createTextNode("\n"), br);
+      });
+      Array.prototype.forEach.call(clone.querySelectorAll("p, div, li"), function (el) {
+        el.appendChild(document.createTextNode("\n"));
+      });
+      var text = clone.textContent || "";
+      return text
+        .replace(/\u00a0/g, " ")
+        .replace(/[ \t]+/g, " ")
+        .replace(/ *\n */g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+    }
+    var t = g.querySelector("text");
+    return t ? t.textContent.replace(/\s+/g, " ").trim() : "";
+  }
+
+  function decorateNodes(box) {
+    var svg = box.querySelector("svg");
+    if (!svg) { return; }
+    Array.prototype.forEach.call(svg.querySelectorAll("g.node"), function (g) {
+      var label = g.querySelector(".nodeLabel");
+      if (label) {
+        label.classList.add("mdv-clamped");
+        var p = label.querySelector("p");
+        if (p) { p.classList.add("mdv-clamped-p"); }
+      }
+      var full = nodeLabelText(g);
+      if (full) { g.setAttribute("data-full-label", full); }
+    });
+    // подписи подграфов (subgraph)
+    Array.prototype.forEach.call(svg.querySelectorAll(".cluster"), function (cl) {
+      var lbl = cl.querySelector(".cluster-label .nodeLabel") || cl.querySelector(".nodeLabel") || cl.querySelector(".cluster-label") || cl.querySelector("text");
+      if (lbl) {
+        var full = (lbl.textContent || "").replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+        if (full) { cl.setAttribute("data-full-label", full); }
+      }
+    });
+  }
+
+  function bindNodeTips(box) {
+    var svg = box.querySelector("svg");
+    if (!svg) { return; }
+    svg.addEventListener("pointerover", function (e) {
+      if (!settings.tooltips) { return; }
+      var el = e.target && e.target.closest ? e.target.closest("[data-full-label]") : null;
+      if (!el) { return; }
+      var full = el.getAttribute("data-full-label");
+      if (!full) { return; }
+      showNodeTip(full, e.clientX, e.clientY);
+    });
+    svg.addEventListener("pointermove", function (e) {
+      if (nodeTip.classList.contains("show")) { placeNodeTip(e.clientX, e.clientY); }
+    });
+    svg.addEventListener("pointerout", function (e) {
+      var el = e.target && e.target.closest ? e.target.closest("[data-full-label]") : null;
+      if (el) { hideNodeTip(); }
+    });
+    svg.addEventListener("pointerleave", hideNodeTip);
+    window.addEventListener("scroll", hideNodeTip, { passive: true });
+  }
+
+  function showNodeTip(text, x, y) {
+    nodeTip.textContent = text;
+    nodeTip.classList.add("show");
+    placeNodeTip(x, y);
+  }
+  function placeNodeTip(x, y) {
+    var pad = 14;
+    var rect = nodeTip.getBoundingClientRect();
+    var left = x + pad;
+    var top = y + pad;
+    if (left + rect.width > window.innerWidth - 8) { left = Math.max(8, x - rect.width - pad); }
+    if (top + rect.height > window.innerHeight - 8) { top = Math.max(8, y - rect.height - pad); }
+    nodeTip.style.left = left + "px";
+    nodeTip.style.top = top + "px";
+  }
+  function hideNodeTip() { nodeTip.classList.remove("show"); }
+
+  /* ---------- копирование ---------- */
   function addCodeCopyButtons() {
     var pres = content.querySelectorAll("pre");
     Array.prototype.forEach.call(pres, function (pre) {
       var code = pre.querySelector("code");
       if (!code) { return; }
       if (code.className && code.className.indexOf("language-mermaid") !== -1) { return; }
+      if (pre.parentNode && pre.parentNode.classList && pre.parentNode.classList.contains("code-block")) { return; }
       var wrapper = document.createElement("div");
       wrapper.className = "code-block";
       pre.parentNode.insertBefore(wrapper, pre);
@@ -666,140 +1447,38 @@
     });
   }
 
-  function buildMermaidBox(svg, source) {
-    var box = document.createElement("div");
-    box.className = "mermaid-box";
-    box._scale = 1;
-    box._mermaidSource = source || "";
-    box.innerHTML =
-      '<div class="mermaid-toolbar">' +
-        '<button type="button" data-act="zoom-in" title="Приблизить">+</button>' +
-        '<button type="button" data-act="zoom-out" title="Отдалить">−</button>' +
-        '<button type="button" data-act="zoom-reset" class="scale" title="Сбросить масштаб">100%</button>' +
-        '<button type="button" data-act="center" title="Центрировать содержимое">⦿</button>' +
-        '<button type="button" data-act="fullscreen" title="На весь экран">⛶</button>' +
-        '<span class="sep"></span>' +
-        '<button type="button" data-act="copy-png" title="Копировать PNG">PNG</button>' +
-        '<button type="button" data-act="copy-svg" title="Копировать SVG">SVG</button>' +
-        '<button type="button" data-act="copy-mmd" title="Копировать код Mermaid">Mermaid</button>' +
-      '</div>' +
-      '<div class="mermaid-viewport"><div class="mermaid-inner">' + svg + '</div></div>';
-    box.querySelector(".mermaid-toolbar").addEventListener("click", function (e) {
-      var btn = e.target && e.target.closest ? e.target.closest("button[data-act]") : null;
-      if (!btn) { return; }
-      handleMermaidAction(box, btn.getAttribute("data-act"));
-    });
-    normalizeMermaidSvg(box);
-    enablePanning(box);
-    return box;
-  }
-
-  function normalizeMermaidSvg(box) {
-    var svg = box.querySelector("svg");
-    if (!svg) { return; }
-    var vb = svg.viewBox && svg.viewBox.baseVal;
-    if (vb && vb.width && vb.height) {
-      svg.setAttribute("width", vb.width);
-      svg.setAttribute("height", vb.height);
-    }
-    svg.style.maxWidth = "none";
-  }
-
-  function enablePanning(box) {
-    var vp = box.querySelector(".mermaid-viewport");
-    var state = null;
-    vp.addEventListener("pointerdown", function (e) {
-      if (e.button !== 0) { return; }
-      state = { x: e.clientX, y: e.clientY, sl: vp.scrollLeft, st: vp.scrollTop };
-      vp.classList.add("panning");
-      if (vp.setPointerCapture) { try { vp.setPointerCapture(e.pointerId); } catch (err) {} }
-      e.preventDefault();
-    });
-    vp.addEventListener("pointermove", function (e) {
-      if (!state) { return; }
-      vp.scrollLeft = state.sl - (e.clientX - state.x);
-      vp.scrollTop = state.st - (e.clientY - state.y);
-    });
-    function endPan() {
-      state = null;
-      vp.classList.remove("panning");
-    }
-    vp.addEventListener("pointerup", endPan);
-    vp.addEventListener("pointercancel", endPan);
-  }
-
-  function handleMermaidAction(box, act) {
-    if (act === "zoom-in") {
-      box._scale = Math.min(8, box._scale * 1.25);
-      applyMermaidScale(box);
-    } else if (act === "zoom-out") {
-      box._scale = Math.max(0.1, box._scale / 1.25);
-      applyMermaidScale(box);
-    } else if (act === "zoom-reset") {
-      box._scale = 1;
-      applyMermaidScale(box);
-    } else if (act === "center") {
-      var vp = box.querySelector(".mermaid-viewport");
-      vp.scrollLeft = Math.max(0, (vp.scrollWidth - vp.clientWidth) / 2);
-      vp.scrollTop = Math.max(0, (vp.scrollHeight - vp.clientHeight) / 2);
-    } else if (act === "fullscreen") {
-      if (document.fullscreenElement) {
-        if (document.exitFullscreen) { document.exitFullscreen().catch(function () {}); }
-      } else if (box.requestFullscreen) {
-        box.requestFullscreen().catch(function () { toast("Не удалось открыть на весь экран"); });
-      }
-    } else if (act === "copy-png") {
-      svgToPngBlob(box.querySelector("svg"), function (blob) {
-        if (blob) { copyPng(blob); } else { toast("Не удалось подготовить PNG"); }
-      });
-    } else if (act === "copy-svg") {
-      copyText(new XMLSerializer().serializeToString(box.querySelector("svg")), "SVG скопирован в буфер");
-    } else if (act === "copy-mmd") {
-      copyText(box._mermaidSource || "", "Код Mermaid скопирован в буфер");
-    }
-  }
-
-  function applyMermaidScale(box) {
-    box.querySelector(".mermaid-inner").style.zoom = box._scale;
-    var pct = Math.round(box._scale * 100);
-    var btn = box.querySelector('[data-act="zoom-reset"]');
-    if (btn) { btn.textContent = pct + "%"; }
-  }
-
   function svgToPngBlob(svg, cb) {
     if (!svg) { cb(null); return; }
     try {
+      var n = { w: 0, h: 0 };
       var vb = svg.viewBox && svg.viewBox.baseVal;
-      var w = vb ? vb.width : 0;
-      var h = vb ? vb.height : 0;
-      if (!w || !h) {
+      if (vb && vb.width && vb.height) { n = { w: vb.width, h: vb.height }; }
+      else {
         var r = svg.getBoundingClientRect();
-        w = r.width || 800;
-        h = r.height || 600;
+        n = { w: r.width || 800, h: r.height || 600 };
       }
       var scale = 2;
       var clone = svg.cloneNode(true);
-      clone.setAttribute("width", w);
-      clone.setAttribute("height", h);
+      clone.setAttribute("width", n.w);
+      clone.setAttribute("height", n.h);
       clone.removeAttribute("style");
       var xml = new XMLSerializer().serializeToString(clone);
       var svg64 = btoa(unescape(encodeURIComponent(xml)));
       var img = new Image();
       img.onload = function () {
         var canvas = document.createElement("canvas");
-        canvas.width = Math.round(w * scale);
-        canvas.height = Math.round(h * scale);
+        canvas.width = Math.round(n.w * scale);
+        canvas.height = Math.round(n.h * scale);
         var ctx = canvas.getContext("2d");
-        ctx.fillStyle = "#ffffff";
+        var bg = getComputedStyle(document.documentElement).getPropertyValue("--panel").trim() || "#ffffff";
+        ctx.fillStyle = bg;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         canvas.toBlob(function (blob) { cb(blob); }, "image/png");
       };
       img.onerror = function () { cb(null); };
       img.src = "data:image/svg+xml;base64," + svg64;
-    } catch (e) {
-      cb(null);
-    }
+    } catch (e) { cb(null); }
   }
 
   function copyText(text, okMsg) {
@@ -816,9 +1495,7 @@
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () { toast(okMsg); }, fallback);
-    } else {
-      fallback();
-    }
+    } else { fallback(); }
   }
 
   function copyPng(blob) {
@@ -830,9 +1507,7 @@
           fallback
         );
       } catch (e) { fallback(); }
-    } else {
-      fallback();
-    }
+    } else { fallback(); }
   }
 
   function downloadPng(blob) {
@@ -844,22 +1519,14 @@
     a.click();
     document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
-    toast("PNG не удалось вставить в буфер - скачан файл diagram.png");
+    toast("PNG скачан файлом diagram.png");
   }
 
-  var toastTimer = null;
   function toast(msg) {
-    var el = document.getElementById("mermaid-toast");
-    if (!el) {
-      el = document.createElement("div");
-      el.id = "mermaid-toast";
-      el.className = "mermaid-toast";
-      document.body.appendChild(el);
-    }
-    el.textContent = msg;
-    el.classList.add("show");
-    if (toastTimer) { clearTimeout(toastTimer); }
-    toastTimer = setTimeout(function () { el.classList.remove("show"); }, 2200);
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    if (tipTimer) { clearTimeout(tipTimer); }
+    tipTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 2200);
   }
 
   function escapeHtml(value) {
@@ -869,6 +1536,47 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
   }
+
+  /* ---------- старт ---------- */
+  buildThemeButtons();
+  applySettings(false);
+
+  // пересборка размеров/масштаба при изменении окна
+  var resizeTimer = null;
+  window.addEventListener("resize", function () {
+    if (resizeTimer) { clearTimeout(resizeTimer); }
+    resizeTimer = setTimeout(function () {
+      resizeTimer = null;
+      Array.prototype.forEach.call(content.querySelectorAll(".mermaid-box"), function (box) {
+        sizeMermaidViewport(box);
+        if (box._atFit) { fitMermaid(box); }
+      });
+    }, 160);
+  });
+
+  // Ctrl/Cmd+O - открыть файл
+  document.addEventListener("keydown", function (e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === "o" || e.key === "O")) {
+      e.preventDefault();
+      fileInput.click();
+    }
+  });
+
+  // в fullscreen подсказка и тост должны жить внутри полноэкранного элемента,
+  // иначе они не видны (всё за пределами :fullscreen не рендерится)
+  function syncOverlayHost() {
+    var host = document.fullscreenElement || document.body;
+    if (nodeTip.parentNode !== host) { host.appendChild(nodeTip); }
+    if (toastEl.parentNode !== host) { host.appendChild(toastEl); }
+  }
+  document.addEventListener("fullscreenchange", syncOverlayHost);
+
+  // для отладки и автотестов
+  window.MDV = {
+    render: render,
+    settings: function () { return Object.assign({}, settings); },
+    rerenderMermaid: rerenderAllMermaid
+  };
 })();
 </script>
 </body>
