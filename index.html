@@ -329,6 +329,11 @@
   nav.toc a.lvl-1 { font-weight: 700; color: var(--fg); margin-top: 9px; }
   nav.toc a.lvl-2 { padding-left: 18px; }
   nav.toc a.lvl-3 { padding-left: 30px; font-size: 12px; }
+  nav.toc a.active {
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-left-color: var(--accent);
+  }
   nav.toc[hidden] { display: none; }
 
   /* ---------- рабочая папка ---------- */
@@ -1518,6 +1523,7 @@
     resolveRelativeImages();
     replayAnimation(content, "content-enter");
     window.scrollTo({ top: 0, behavior: "auto" });
+    updateActiveToc();
   }
 
   function buildToc() {
@@ -1532,6 +1538,53 @@
     }
     toc.innerHTML = items.join("");
   }
+
+  /* ---------- scroll-spy: подсветка текущего раздела в оглавлении ---------- */
+  function updateActiveToc() {
+    var headings = content.querySelectorAll("h1, h2, h3");
+    var links = toc.querySelectorAll("a");
+    var activeId = "";
+    if (headings.length) {
+      var offset = 80;
+      for (var i = 0; i < headings.length; i++) {
+        if (headings[i].getBoundingClientRect().top <= offset) {
+          activeId = headings[i].id;
+        } else {
+          break;
+        }
+      }
+    }
+    var activeLink = null;
+    Array.prototype.forEach.call(links, function (link) {
+      var id = (link.getAttribute("href") || "").replace(/^#/, "");
+      var isActive = id === activeId;
+      link.classList.toggle("active", isActive);
+      if (isActive) { activeLink = link; }
+    });
+    if (activeLink && !toc.hidden) { keepTocLinkVisible(activeLink); }
+  }
+
+  function keepTocLinkVisible(link) {
+    var navRect = toc.getBoundingClientRect();
+    var linkRect = link.getBoundingClientRect();
+    if (linkRect.top < navRect.top) {
+      toc.scrollTop += linkRect.top - navRect.top - 8;
+    } else if (linkRect.bottom > navRect.bottom) {
+      toc.scrollTop += linkRect.bottom - navRect.bottom + 8;
+    }
+  }
+
+  var scrollSpyTick = false;
+  function scheduleScrollSpy() {
+    if (scrollSpyTick) { return; }
+    scrollSpyTick = true;
+    requestAnimationFrame(function () {
+      scrollSpyTick = false;
+      updateActiveToc();
+    });
+  }
+  window.addEventListener("scroll", scheduleScrollSpy, { passive: true });
+  window.addEventListener("resize", scheduleScrollSpy);
 
   /* ---------- mermaid ---------- */
   function mermaidConfig() {
