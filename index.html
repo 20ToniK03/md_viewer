@@ -1518,6 +1518,7 @@
   function render(text) {
     content.innerHTML = marked.parse(text);
     buildToc();
+    scrollSpyActiveId = "";
     renderMermaidBlocks();
     addCodeCopyButtons();
     resolveRelativeImages();
@@ -1543,19 +1544,19 @@
   var scrollSpyLocked = false;
   var scrollSpyTargetId = "";
   var scrollSpyLockTimer = null;
+  var scrollSpyActiveId = "";
 
-  function computeActiveId(headings) {
-    if (!headings.length) { return ""; }
+  function computeActiveIndex(headings) {
     var offset = 80;
-    var id = "";
+    var idx = -1;
     for (var i = 0; i < headings.length; i++) {
       if (headings[i].getBoundingClientRect().top <= offset) {
-        id = headings[i].id;
+        idx = i;
       } else {
         break;
       }
     }
-    return id;
+    return idx;
   }
 
   function setTocActive(id) {
@@ -1572,8 +1573,42 @@
 
   function updateActiveToc() {
     var headings = content.querySelectorAll("h1, h2, h3");
-    var activeId = scrollSpyLocked ? scrollSpyTargetId : computeActiveId(headings);
-    setTocActive(activeId);
+    if (scrollSpyLocked) {
+      scrollSpyActiveId = scrollSpyTargetId;
+      setTocActive(scrollSpyActiveId);
+      return;
+    }
+    if (!headings.length) {
+      scrollSpyActiveId = "";
+      return;
+    }
+
+    var offset = 80;
+    var margin = 6; // гистерезис: гасим мелкий «откат» скролла у границы разделов
+    var candIndex = computeActiveIndex(headings);
+
+    var activeIndex = -1;
+    for (var j = 0; j < headings.length; j++) {
+      if (headings[j].id === scrollSpyActiveId) { activeIndex = j; break; }
+    }
+
+    var newId;
+    if (candIndex === -1) {
+      newId = "";
+    } else if (activeIndex === -1 || candIndex === activeIndex || candIndex > activeIndex) {
+      // нет активного / тот же раздел / листаем вниз — принимаем кандидата сразу
+      newId = headings[candIndex].id;
+    } else {
+      // листаем вверх: переключаемся на предыдущий раздел, только когда текущий
+      // заголовок явно ушёл ниже порога (запас в `margin` убирает дёрганье)
+      var activeTop = headings[activeIndex].getBoundingClientRect().top;
+      newId = (activeTop > offset + margin) ? headings[candIndex].id : scrollSpyActiveId;
+    }
+
+    if (newId !== scrollSpyActiveId) {
+      scrollSpyActiveId = newId;
+      setTocActive(newId);
+    }
   }
 
   function keepTocLinkVisible(link) {
