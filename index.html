@@ -265,12 +265,30 @@
     background: var(--panel-2);
   }
   .toc-tabs {
+    position: relative;
     display: flex;
     gap: 4px;
     flex: 1 1 auto;
     min-width: 0;
   }
+  .toc-indicator {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: var(--accent-soft);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    transition: transform .24s cubic-bezier(.4, 0, .2, 1), width .24s cubic-bezier(.4, 0, .2, 1);
+    z-index: 0;
+    pointer-events: none;
+  }
+  .toc-tabs.has-folder .toc-indicator { width: 50%; }
+  .toc-tabs.folder-active .toc-indicator { transform: translateX(100%); }
   .toc-tab {
+    position: relative;
+    z-index: 1;
     flex: 1 1 auto;
     padding: 6px 6px;
     font: inherit;
@@ -284,10 +302,10 @@
     cursor: pointer;
     white-space: nowrap;
     text-align: center;
-    transition: color .15s ease, background .15s ease, border-color .15s ease;
+    transition: color .15s ease, background .15s ease;
   }
-  .toc-tab:hover { color: var(--fg); background: var(--accent-soft); }
-  .toc-tab.active { color: var(--accent); background: var(--accent-soft); border-color: var(--border); }
+  .toc-tab:hover:not(.active) { color: var(--fg); background: var(--accent-soft); }
+  .toc-tab.active { color: var(--accent); }
   .toc-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   nav.toc {
@@ -345,8 +363,26 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  ul.file-tree { list-style: none; margin: 0; padding: 0; }
-  ul.file-tree ul { list-style: none; margin: 0; padding-left: 14px; }
+  ul.file-tree { list-style: none; margin: 0; padding: 0 0 0 20px; }
+  ul.file-tree ul {
+    list-style: none;
+    margin: 0 0 0 12px;
+    padding: 0 0 0 14px;
+    border-left: 1px solid var(--border);
+  }
+  ul.file-tree ul > li > :is(button, .file-other) {
+    position: relative;
+  }
+  ul.file-tree ul > li > :is(button, .file-other)::before {
+    content: "";
+    position: absolute;
+    left: -15px;
+    top: 50%;
+    width: 18px;
+    height: 1px;
+    transform: translateY(-50%);
+    background: var(--border);
+  }
   .file-tree li { margin: 0; }
   .file-tree li.closed > ul { display: none; }
   .file-tree button {
@@ -764,6 +800,7 @@
   <aside class="toc-panel">
     <div class="toc-head">
       <div class="toc-tabs" role="tablist">
+        <span class="toc-indicator" aria-hidden="true"></span>
         <button type="button" class="toc-tab active" id="tab-toc" role="tab" aria-selected="true" aria-controls="toc">Оглавление</button>
         <button type="button" class="toc-tab" id="tab-folder" role="tab" aria-selected="false" aria-controls="folder" hidden>Рабочая папка</button>
       </div>
@@ -1345,6 +1382,9 @@
     var open = isFolderOpen();
     var folder = (tab === "folder") && open;
     tabFolder.hidden = !open;
+    var tabsWrap = tabToc.parentNode;
+    tabsWrap.classList.toggle("has-folder", open);
+    tabsWrap.classList.toggle("folder-active", folder);
     tabToc.classList.toggle("active", !folder);
     tabFolder.classList.toggle("active", folder);
     tabToc.setAttribute("aria-selected", folder ? "false" : "true");
