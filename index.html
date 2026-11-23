@@ -1540,28 +1540,40 @@
   }
 
   /* ---------- scroll-spy: подсветка текущего раздела в оглавлении ---------- */
-  function updateActiveToc() {
-    var headings = content.querySelectorAll("h1, h2, h3");
-    var links = toc.querySelectorAll("a");
-    var activeId = "";
-    if (headings.length) {
-      var offset = 80;
-      for (var i = 0; i < headings.length; i++) {
-        if (headings[i].getBoundingClientRect().top <= offset) {
-          activeId = headings[i].id;
-        } else {
-          break;
-        }
+  var scrollSpyLocked = false;
+  var scrollSpyTargetId = "";
+  var scrollSpyLockTimer = null;
+
+  function computeActiveId(headings) {
+    if (!headings.length) { return ""; }
+    var offset = 80;
+    var id = "";
+    for (var i = 0; i < headings.length; i++) {
+      if (headings[i].getBoundingClientRect().top <= offset) {
+        id = headings[i].id;
+      } else {
+        break;
       }
     }
+    return id;
+  }
+
+  function setTocActive(id) {
+    var links = toc.querySelectorAll("a");
     var activeLink = null;
     Array.prototype.forEach.call(links, function (link) {
-      var id = (link.getAttribute("href") || "").replace(/^#/, "");
-      var isActive = id === activeId;
+      var linkId = (link.getAttribute("href") || "").replace(/^#/, "");
+      var isActive = linkId === id;
       link.classList.toggle("active", isActive);
       if (isActive) { activeLink = link; }
     });
     if (activeLink && !toc.hidden) { keepTocLinkVisible(activeLink); }
+  }
+
+  function updateActiveToc() {
+    var headings = content.querySelectorAll("h1, h2, h3");
+    var activeId = scrollSpyLocked ? scrollSpyTargetId : computeActiveId(headings);
+    setTocActive(activeId);
   }
 
   function keepTocLinkVisible(link) {
@@ -1574,6 +1586,28 @@
     }
   }
 
+  function releaseScrollSpyLock() {
+    if (!scrollSpyLocked) { return; }
+    scrollSpyLocked = false;
+    scrollSpyTargetId = "";
+    if (scrollSpyLockTimer) { clearTimeout(scrollSpyLockTimer); scrollSpyLockTimer = null; }
+    updateActiveToc();
+  }
+
+  // клик по пункту оглавления: подсветка ставится сразу,
+  // а экран плавно скроллится к разделу (дефолтный переход по якорю)
+  toc.addEventListener("click", function (e) {
+    var link = e.target && e.target.closest ? e.target.closest("a") : null;
+    if (!link) { return; }
+    var id = (link.getAttribute("href") || "").replace(/^#/, "");
+    if (!id) { return; }
+    scrollSpyLocked = true;
+    scrollSpyTargetId = id;
+    setTocActive(id);
+    if (scrollSpyLockTimer) { clearTimeout(scrollSpyLockTimer); }
+    scrollSpyLockTimer = setTimeout(releaseScrollSpyLock, 1200);
+  });
+
   var scrollSpyTick = false;
   function scheduleScrollSpy() {
     if (scrollSpyTick) { return; }
@@ -1585,6 +1619,9 @@
   }
   window.addEventListener("scroll", scheduleScrollSpy, { passive: true });
   window.addEventListener("resize", scheduleScrollSpy);
+  window.addEventListener("scrollend", function () {
+    if (scrollSpyLocked) { releaseScrollSpyLock(); }
+  });
 
   /* ---------- mermaid ---------- */
   function mermaidConfig() {
