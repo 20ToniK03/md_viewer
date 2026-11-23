@@ -259,40 +259,36 @@
   .toc-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 10px 8px 10px 14px;
+    gap: 4px;
+    padding: 6px 7px;
     border-bottom: 1px solid var(--border);
     background: var(--panel-2);
   }
-  .toc-head-title {
-    font-size: 10.5px;
-    font-weight: 800;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    color: var(--muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  .toc-tabs {
+    display: flex;
+    gap: 4px;
+    flex: 1 1 auto;
+    min-width: 0;
   }
-  .toc-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    padding: 0;
+  .toc-tab {
+    flex: 1 1 auto;
+    padding: 6px 6px;
     font: inherit;
-    font-size: 15px;
-    line-height: 1;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: .02em;
     color: var(--muted);
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 6px;
+    border-radius: 7px;
     cursor: pointer;
+    white-space: nowrap;
+    text-align: center;
+    transition: color .15s ease, background .15s ease, border-color .15s ease;
   }
-  .toc-toggle:hover { color: var(--accent); background: var(--accent-soft); border-color: var(--border); }
-  .toc-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .toc-tab:hover { color: var(--fg); background: var(--accent-soft); }
+  .toc-tab.active { color: var(--accent); background: var(--accent-soft); border-color: var(--border); }
+  .toc-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   nav.toc {
     flex: 1 1 auto;
@@ -315,6 +311,106 @@
   nav.toc a.lvl-1 { font-weight: 700; color: var(--fg); margin-top: 9px; }
   nav.toc a.lvl-2 { padding-left: 18px; }
   nav.toc a.lvl-3 { padding-left: 30px; font-size: 12px; }
+  nav.toc[hidden] { display: none; }
+
+  /* ---------- рабочая папка ---------- */
+  nav.folder {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 8px 8px 24px;
+    font-size: 13px;
+  }
+  nav.folder[hidden] { display: none; }
+  .folder-empty {
+    padding: 16px 12px;
+    color: var(--muted);
+    font-size: 12.5px;
+    line-height: 1.55;
+    text-align: center;
+  }
+  .folder-root {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 8px 7px;
+    margin-bottom: 3px;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--fg);
+  }
+  .folder-root svg { flex: 0 0 auto; color: var(--accent); }
+  .folder-root .fname {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  ul.file-tree { list-style: none; margin: 0; padding: 0; }
+  ul.file-tree ul { list-style: none; margin: 0; padding-left: 14px; }
+  .file-tree li { margin: 0; }
+  .file-tree li.closed > ul { display: none; }
+  .file-tree button {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 3px 8px;
+    font: inherit;
+    font-size: 13px;
+    color: var(--fg);
+    background: transparent;
+    border: 0;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: left;
+    overflow: hidden;
+  }
+  .file-tree button:hover { background: var(--accent-soft); }
+  .file-tree button svg { flex: 0 0 auto; color: var(--muted); }
+  .file-tree .dir-toggle { font-weight: 600; }
+  .file-tree .dir-toggle .tw {
+    flex: 0 0 auto;
+    width: 11px;
+    color: var(--muted);
+    font-size: 11px;
+    text-align: center;
+    transition: transform .12s ease;
+  }
+  .file-tree li.open > .dir-toggle .tw { transform: rotate(90deg); }
+  .file-tree .file-btn { color: var(--muted); }
+  .file-tree .file-btn.md { color: var(--fg); }
+  .file-tree .file-btn.md svg { color: var(--accent); }
+  .file-tree .fname {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .file-tree .file-other {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    color: var(--muted);
+    opacity: .72;
+    overflow: hidden;
+  }
+  .file-tree .file-other svg { flex: 0 0 auto; }
+
+  /* ---------- анимации ---------- */
+  @keyframes panelIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes contentIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+  }
+  nav.toc.panel-enter, nav.folder.panel-enter { animation: panelIn .22s ease; }
+  main.content.content-enter { animation: contentIn .26s ease; }
+  @media (prefers-reduced-motion: reduce) {
+    nav.toc.panel-enter, nav.folder.panel-enter, main.content.content-enter { animation: none; }
+  }
 
   .splitter {
     position: sticky;
@@ -620,7 +716,8 @@
   <span class="sub" id="file-name">файл не выбран</span>
   <div class="top-actions">
     <button type="button" class="tb-btn icon" id="toc-top-toggle" title="Скрыть оглавление" aria-label="Скрыть оглавление" aria-pressed="true"></button>
-    <button type="button" class="tb-btn icon" id="open-btn" title="Открыть файл" aria-label="Открыть файл"></button>
+    <button type="button" class="tb-btn icon" id="open-btn" title="Добавить файл" aria-label="Добавить файл"></button>
+    <button type="button" class="tb-btn icon" id="open-folder-btn" title="Добавить папку" aria-label="Добавить папку"></button>
     <div class="menu-wrap">
       <button type="button" class="tb-btn icon" id="settings-btn" title="Настройки" aria-label="Настройки" aria-haspopup="dialog" aria-expanded="false" aria-controls="settings-pop"></button>
       <div class="settings-pop" id="settings-pop" role="dialog" aria-label="Настройки вида">
@@ -666,27 +763,29 @@
 <div class="layout" id="layout">
   <aside class="toc-panel">
     <div class="toc-head">
-      <span class="toc-head-title">Оглавление</span>
-      <button type="button" class="toc-toggle" id="toc-toggle" aria-controls="toc" aria-expanded="true" title="Скрыть оглавление">
-        <span class="icon" aria-hidden="true">&laquo;</span>
-      </button>
+      <div class="toc-tabs" role="tablist">
+        <button type="button" class="toc-tab active" id="tab-toc" role="tab" aria-selected="true" aria-controls="toc">Оглавление</button>
+        <button type="button" class="toc-tab" id="tab-folder" role="tab" aria-selected="false" aria-controls="folder" hidden>Рабочая папка</button>
+      </div>
     </div>
-    <nav class="toc" id="toc"></nav>
+    <nav class="toc" id="toc" role="tabpanel"></nav>
+    <nav class="folder" id="folder" role="tabpanel" hidden></nav>
   </aside>
   <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" title="Перетащите, чтобы изменить ширину. Двойной клик - сброс"></div>
   <main class="content" id="content">
     <div class="empty">
       <div class="big">Откройте Markdown-файл, чтобы увидеть его оформленным</div>
       <ul>
-        <li>перетащите файл прямо на страницу</li>
-        <li>или нажмите на иконку папки вверху</li>
+        <li>перетащите файл или папку прямо на страницу</li>
+        <li>или нажмите на кнопки файла/папки вверху</li>
       </ul>
     </div>
   </main>
 </div>
 
 <input type="file" id="file-input" accept=".md,.markdown,.txt,text/markdown,text/plain" hidden>
-<div class="overlay" id="overlay">Отпустите файл, чтобы открыть</div>
+<input type="file" id="folder-input" webkitdirectory hidden>
+<div class="overlay" id="overlay">Отпустите файл или папку, чтобы открыть</div>
 <div class="node-tip" id="node-tip" role="tooltip"></div>
 <div class="toast" id="toast"></div>
 
@@ -778,9 +877,13 @@
   var overlay = document.getElementById("overlay");
   var layout = document.getElementById("layout");
   var splitter = document.getElementById("splitter");
-  var tocToggle = document.getElementById("toc-toggle");
   var tocTopToggle = document.getElementById("toc-top-toggle");
   var openBtn = document.getElementById("open-btn");
+  var openFolderBtn = document.getElementById("open-folder-btn");
+  var folderInput = document.getElementById("folder-input");
+  var folderEl = document.getElementById("folder");
+  var tabToc = document.getElementById("tab-toc");
+  var tabFolder = document.getElementById("tab-folder");
   var settingsBtn = document.getElementById("settings-btn");
   var settingsPop = document.getElementById("settings-pop");
   var settingsClose = document.getElementById("settings-close");
@@ -813,6 +916,11 @@
   var ICONS = {
     open: svgIcon('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
     openActive: svgIcon('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor"/>'),
+    folder: svgIcon('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
+    folderFilled: svgIcon('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor" stroke="none"/>'),
+    folderOpen: svgIcon('<path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2z"/>'),
+    file: svgIcon('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>'),
+    fileFilled: svgIcon('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" fill="currentColor" stroke="none"/>'),
     settings: svgIcon('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>'),
     toc: svgIcon('<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/>'),
     tocActive: svgIcon('<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><path d="M3 5v14a2 2 0 0 0 2 2h4V3H5a2 2 0 0 0-2 2z" fill="currentColor" stroke="none"/>'),
@@ -974,15 +1082,11 @@
     var collapsed = width === 0;
     layout.classList.toggle("toc-collapsed", collapsed);
     toc.setAttribute("aria-hidden", collapsed ? "true" : "false");
+    if (folderEl) { folderEl.setAttribute("aria-hidden", collapsed ? "true" : "false"); }
     if (!collapsed) { lastOpenWidth = width; }
     updateTocToggle(collapsed);
   }
   function updateTocToggle(collapsed) {
-    tocToggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
-    var text = collapsed ? "Показать оглавление" : "Скрыть оглавление";
-    tocToggle.title = text;
-    tocToggle.setAttribute("aria-label", text);
-    tocToggle.querySelector(".icon").textContent = collapsed ? "\u2630" : "\u00ab";
     if (tocTopToggle) {
       tocTopToggle.setAttribute("aria-pressed", collapsed ? "false" : "true");
       tocTopToggle.title = collapsed ? "Показать оглавление" : "Скрыть оглавление";
@@ -994,7 +1098,6 @@
     if (tocWidth === 0) { applyTocWidth(lastOpenWidth || DEFAULT_TOC_WIDTH); }
     else { applyTocWidth(0); }
   }
-  tocToggle.addEventListener("click", toggleToc);
   tocTopToggle.addEventListener("click", toggleToc);
   splitter.addEventListener("pointerdown", function (e) {
     e.preventDefault();
@@ -1046,15 +1149,41 @@
     e.preventDefault();
     dragDepth = 0;
     overlay.classList.remove("visible");
-    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
-      handleFiles(e.dataTransfer.files);
+    var dt = e.dataTransfer;
+    if (!dt) { return; }
+    var items = dt.items;
+    if (items && items.length && items[0].webkitGetAsEntry) {
+      var entries = [];
+      var dirs = [];
+      Array.prototype.forEach.call(items, function (it) {
+        var entry = it.webkitGetAsEntry && it.webkitGetAsEntry();
+        if (!entry) { return; }
+        if (entry.isDirectory) { dirs.push(entry); } else { entries.push(entry); }
+      });
+      if (dirs.length) {
+        readDroppedEntries(dirs, function (list) {
+          if (list.length) { setFolderEntries(list); }
+        });
+        return;
+      }
+      if (entries.length) {
+        readDroppedEntries(entries, function (list) {
+          var files = list.map(function (x) { return x.file; });
+          if (files.length) { handleFiles(files); }
+        });
+        return;
+      }
     }
+    if (dt.files && dt.files.length) { handleFiles(dt.files); }
   });
 
   function handleFiles(files) {
     if (!files || !files.length) { return; }
     var file = files[0];
     var name = file.name || "файл";
+    clearFolder();
+    fileOpened = true;
+    updateFileButton();
     fileName.textContent = files.length > 1 ? (files.length + " файлов, открыт: " + name) : name;
     readFile(file, function (text) { render(text); });
   }
@@ -1067,13 +1196,269 @@
     reader.readAsText(file, "utf-8");
   }
 
+  /* ---------- рабочая папка ---------- */
+  var folderEntries = [];   // [{ file: File, path: "папка/подпапка/файл.md" }]
+  var folderName = "";
+  var currentFilePath = "";
+
+  function isFolderOpen() { return folderName !== ""; }
+
+  var fileOpened = false;
+
+  function updateFileButton() {
+    openBtn.innerHTML = fileOpened ? ICONS.fileFilled : ICONS.file;
+  }
+  function updateFolderButton() {
+    openFolderBtn.innerHTML = isFolderOpen() ? ICONS.folderFilled : ICONS.folder;
+  }
+  openFolderBtn.addEventListener("click", function () { folderInput.click(); });
+
+  folderInput.addEventListener("change", function () {
+    if (folderInput.files && folderInput.files.length) { setFolder(folderInput.files); }
+    folderInput.value = "";
+  });
+
+  function isMarkdownName(name) {
+    return /\.(md|markdown|mdown|mkd|txt|text)$/i.test(name);
+  }
+
+  function setFolder(files) {
+    var entries = [];
+    Array.prototype.forEach.call(files || [], function (f) {
+      entries.push({ file: f, path: (f.webkitRelativePath || f.name).replace(/\\/g, "/") });
+    });
+    setFolderEntries(entries);
+  }
+
+  function setFolderEntries(entries) {
+    folderEntries = entries || [];
+    folderName = "";
+    if (folderEntries.length) {
+      var parts = folderEntries[0].path.split("/");
+      folderName = parts.length > 1 ? parts[0] : "";
+    }
+    updateFolderUI();
+    renderFolderView();
+  }
+
+  function buildFolderTree() {
+    var root = { dirs: {}, files: [] };
+    folderEntries.forEach(function (en, idx) {
+      var parts = en.path.split("/");
+      if (parts[0] === "") { parts.shift(); }
+      if (!parts.length) { return; }
+      var node = root;
+      for (var i = 1; i < parts.length; i++) {
+        if (i === parts.length - 1) {
+          node.files.push({ name: parts[i], file: en.file, idx: idx });
+        } else {
+          if (!node.dirs[parts[i]]) { node.dirs[parts[i]] = { dirs: {}, files: [] }; }
+          node = node.dirs[parts[i]];
+        }
+      }
+      if (parts.length === 1) { root.files.push({ name: parts[0], file: en.file, idx: idx }); }
+    });
+    return root;
+  }
+
+  function cmpName(a, b) {
+    a = String(a).toLowerCase();
+    b = String(b).toLowerCase();
+    return a < b ? -1 : (a > b ? 1 : 0);
+  }
+
+  function renderFolderView() {
+    if (!folderEntries.length) {
+      folderEl.innerHTML = '<div class="folder-empty">Рабочая папка не выбрана.<br>Перетащите папку на страницу, чтобы увидеть её содержимое.</div>';
+      return;
+    }
+    var root = buildFolderTree();
+    var html = "";
+    if (folderName) {
+      html += '<div class="folder-root">' + ICONS.folderOpen + '<span class="fname">' + escapeHtml(folderName) + '</span></div>';
+    }
+    html += '<ul class="file-tree">' + renderFolderNodes(root) + "</ul>";
+    folderEl.innerHTML = html;
+  }
+
+  function renderFolderNodes(node) {
+    var out = "";
+    var dirNames = Object.keys(node.dirs).sort(cmpName);
+    dirNames.forEach(function (name) {
+      var child = node.dirs[name];
+      out += '<li class="dir closed">' +
+        '<button type="button" class="dir-toggle" aria-expanded="false">' +
+          '<span class="tw">\u25b8</span>' + ICONS.folder + '<span class="fname">' + escapeHtml(name) + '</span>' +
+        '</button>' +
+        '<ul>' + renderFolderNodes(child) + '</ul>' +
+      '</li>';
+    });
+    var files = node.files.slice().sort(function (a, b) { return cmpName(a.name, b.name); });
+    files.forEach(function (f) {
+      if (isMarkdownName(f.name)) {
+        out += '<li class="file">' +
+          '<button type="button" class="file-btn md" data-file="' + f.idx + '" title="' + escapeHtml(f.name) + '">' +
+            ICONS.file + '<span class="fname">' + escapeHtml(f.name) + '</span>' +
+          '</button>' +
+        '</li>';
+      } else {
+        out += '<li class="file">' +
+          '<span class="file-other" title="' + escapeHtml(f.name) + '">' + ICONS.file + '<span class="fname">' + escapeHtml(f.name) + '</span></span>' +
+        '</li>';
+      }
+    });
+    return out;
+  }
+
+  folderEl.addEventListener("click", function (e) {
+    var toggle = e.target && e.target.closest ? e.target.closest(".dir-toggle") : null;
+    if (toggle) {
+      var li = toggle.parentNode;
+      var open = li.classList.toggle("open");
+      li.classList.toggle("closed", !open);
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      return;
+    }
+    var btn = e.target && e.target.closest ? e.target.closest("[data-file]") : null;
+    if (btn) {
+      var idx = parseInt(btn.getAttribute("data-file"), 10);
+      var en = folderEntries[idx];
+      if (en) { openFolderFile(en); }
+    }
+  });
+
+  function openFolderFile(entry) {
+    currentFilePath = entry.path;
+    fileOpened = true;
+    updateFileButton();
+    fileName.textContent = entry.path;
+    readFile(entry.file, function (text) { render(text); });
+  }
+
+  function replayAnimation(el, cls) {
+    el.classList.remove(cls);
+    void el.offsetWidth; // перезапуск анимации
+    el.classList.add(cls);
+  }
+
+  function switchTab(tab) {
+    var open = isFolderOpen();
+    var folder = (tab === "folder") && open;
+    tabFolder.hidden = !open;
+    tabToc.classList.toggle("active", !folder);
+    tabFolder.classList.toggle("active", folder);
+    tabToc.setAttribute("aria-selected", folder ? "false" : "true");
+    tabFolder.setAttribute("aria-selected", folder ? "true" : "false");
+    if (folder) {
+      toc.hidden = true;
+      folderEl.hidden = false;
+      replayAnimation(folderEl, "panel-enter");
+    } else {
+      folderEl.hidden = true;
+      toc.hidden = false;
+      replayAnimation(toc, "panel-enter");
+    }
+  }
+  function updateFolderUI() {
+    switchTab(isFolderOpen() ? "folder" : "toc");
+    updateFolderButton();
+  }
+  function clearFolder() {
+    folderEntries = [];
+    folderName = "";
+    currentFilePath = "";
+    updateFolderUI();
+  }
+  tabToc.addEventListener("click", function () { switchTab("toc"); });
+  tabFolder.addEventListener("click", function () { switchTab("folder"); });
+
+  // чтение брошенных через drag&drop папок/файлов (через FileSystem API)
+  function readDroppedEntries(entries, cb) {
+    var out = [];
+    var pending = entries.length;
+    if (!pending) { cb(out); return; }
+    entries.forEach(function (entry) {
+      walkEntry(entry, "", function () {
+        if (--pending === 0) { cb(out); }
+      });
+    });
+
+    function walkEntry(entry, basePath, done) {
+      if (entry.isFile) {
+        entry.file(function (file) {
+          out.push({ file: file, path: basePath ? basePath + "/" + entry.name : entry.name });
+          done();
+        }, function () { done(); });
+      } else if (entry.isDirectory) {
+        var reader = entry.createReader();
+        var all = [];
+        (function readBatch() {
+          reader.readEntries(function (batch) {
+            if (!batch.length) {
+              var sub = all.length;
+              if (!sub) { done(); return; }
+              all.forEach(function (child) {
+                walkEntry(child, basePath ? basePath + "/" + entry.name : entry.name, function () {
+                  if (--sub === 0) { done(); }
+                });
+              });
+              return;
+            }
+            all = all.concat(Array.prototype.slice.call(batch));
+            readBatch();
+          }, function () { done(); });
+        })();
+      } else {
+        done();
+      }
+    }
+  }
+
+  function findEntryByPath(path) {
+    var norm = String(path).replace(/\\/g, "/");
+    for (var i = 0; i < folderEntries.length; i++) {
+      if (folderEntries[i].path === norm) { return folderEntries[i]; }
+    }
+    return null;
+  }
+
+  function safeDecode(s) {
+    try { return decodeURIComponent(s); } catch (e) { return s; }
+  }
+
+  // подставляем blob-URL для картинок с относительными путями (в контексте рабочей папки)
+  function resolveRelativeImages() {
+    if (!currentFilePath || !folderEntries.length) { return; }
+    var base = currentFilePath.split("/");
+    base.pop();
+    var baseParts = base.join("/") ? base : [];
+    var imgs = content.querySelectorAll("img");
+    Array.prototype.forEach.call(imgs, function (img) {
+      var src = img.getAttribute("src") || "";
+      if (/^(https?:|data:|blob:|file:|#)/i.test(src) || src.indexOf("//") === 0) { return; }
+      var norm = safeDecode(src.split("#")[0].split("?")[0]);
+      var stack = baseParts.slice();
+      var seg = norm.replace(/\\/g, "/").split("/");
+      seg.forEach(function (p) {
+        if (!p || p === ".") { return; }
+        if (p === "..") { stack.pop(); }
+        else { stack.push(p); }
+      });
+      var entry = findEntryByPath(stack.join("/"));
+      if (entry) {
+        try { img.src = URL.createObjectURL(entry.file); } catch (err) {}
+      }
+    });
+  }
+
   /* ---------- рендер markdown ---------- */
   function render(text) {
     content.innerHTML = marked.parse(text);
-    openBtn.innerHTML = ICONS.openActive;
     buildToc();
     renderMermaidBlocks();
     addCodeCopyButtons();
+    resolveRelativeImages();
+    replayAnimation(content, "content-enter");
     window.scrollTo({ top: 0, behavior: "auto" });
   }
 
@@ -1542,11 +1927,12 @@
 
   /* ---------- старт ---------- */
   // иконки кнопок верхней панели
-  openBtn.innerHTML = ICONS.open;
+  updateFileButton();
   settingsBtn.innerHTML = ICONS.settings;
   tocTopToggle.innerHTML = ICONS.tocActive;
   buildThemeButtons();
   applySettings(false);
+  updateFolderUI();
 
   // пересборка размеров/масштаба при изменении окна
   var resizeTimer = null;
