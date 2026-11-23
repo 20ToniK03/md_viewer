@@ -416,6 +416,12 @@
   .file-tree .file-btn { color: var(--muted); }
   .file-tree .file-btn.md { color: var(--fg); }
   .file-tree .file-btn.md svg { color: var(--accent); }
+  .file-tree .file-btn.selected {
+    color: var(--accent);
+    background: var(--accent-soft);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  .file-tree .file-btn.selected svg { color: var(--accent); }
   .file-tree .fname {
     min-width: 0;
     overflow: hidden;
@@ -1270,6 +1276,7 @@
   function setFolderEntries(entries) {
     folderEntries = entries || [];
     folderName = "";
+    currentFilePath = "";
     if (folderEntries.length) {
       var parts = folderEntries[0].path.split("/");
       folderName = parts.length > 1 ? parts[0] : "";
@@ -1316,6 +1323,7 @@
     }
     html += '<ul class="file-tree">' + renderFolderNodes(root) + "</ul>";
     folderEl.innerHTML = html;
+    updateFolderSelection();
   }
 
   function renderFolderNodes(node) {
@@ -1368,8 +1376,18 @@
     currentFilePath = entry.path;
     fileOpened = true;
     updateFileButton();
+    updateFolderSelection();
     fileName.textContent = entry.path;
     readFile(entry.file, function (text) { render(text); });
+  }
+
+  function updateFolderSelection() {
+    var btns = folderEl.querySelectorAll(".file-btn");
+    Array.prototype.forEach.call(btns, function (btn) {
+      var idx = parseInt(btn.getAttribute("data-file"), 10);
+      var en = folderEntries[idx];
+      btn.classList.toggle("selected", !!en && en.path === currentFilePath);
+    });
   }
 
   function replayAnimation(el, cls) {
