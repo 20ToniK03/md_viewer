@@ -1541,9 +1541,6 @@
   }
 
   /* ---------- scroll-spy: подсветка текущего раздела в оглавлении ---------- */
-  var scrollSpyLocked = false;
-  var scrollSpyTargetId = "";
-  var scrollSpyLockTimer = null;
   var scrollSpyActiveId = "";
 
   function computeActiveIndex(headings) {
@@ -1571,20 +1568,34 @@
     if (activeLink && !toc.hidden) { keepTocLinkVisible(activeLink); }
   }
 
+  function isAtDocumentBottom() {
+    var se = document.scrollingElement || document.documentElement;
+    var maxScroll = se.scrollHeight - window.innerHeight;
+    if (maxScroll <= 0) { return false; } // документ помещается на экран, скролла нет
+    return se.scrollTop >= maxScroll - 8;
+  }
+
   function updateActiveToc() {
     var headings = content.querySelectorAll("h1, h2, h3");
-    if (scrollSpyLocked) {
-      scrollSpyActiveId = scrollSpyTargetId;
-      setTocActive(scrollSpyActiveId);
-      return;
-    }
     if (!headings.length) {
       scrollSpyActiveId = "";
       return;
     }
 
+    // Докрутили до самого низа страницы: активен последний раздел, даже если его
+    // заголовок не добрался до порога (короткая последняя секция, которой не
+    // хватает высоты, чтобы заголовок поднялся в зону скролл-спая).
+    if (isAtDocumentBottom()) {
+      var lastId = headings[headings.length - 1].id;
+      if (lastId !== scrollSpyActiveId) {
+        scrollSpyActiveId = lastId;
+        setTocActive(lastId);
+      }
+      return;
+    }
+
     var offset = 80;
-    var margin = 6; // гистерезис: гасим мелкий «откат» скролла у границы разделов
+    var margin = 10; // гистерезис: гасим мелкий «откат» скролла у границы разделов
     var candIndex = computeActiveIndex(headings);
 
     var activeIndex = -1;
@@ -1621,28 +1632,6 @@
     }
   }
 
-  function releaseScrollSpyLock() {
-    if (!scrollSpyLocked) { return; }
-    scrollSpyLocked = false;
-    scrollSpyTargetId = "";
-    if (scrollSpyLockTimer) { clearTimeout(scrollSpyLockTimer); scrollSpyLockTimer = null; }
-    updateActiveToc();
-  }
-
-  // клик по пункту оглавления: подсветка ставится сразу,
-  // а экран плавно скроллится к разделу (дефолтный переход по якорю)
-  toc.addEventListener("click", function (e) {
-    var link = e.target && e.target.closest ? e.target.closest("a") : null;
-    if (!link) { return; }
-    var id = (link.getAttribute("href") || "").replace(/^#/, "");
-    if (!id) { return; }
-    scrollSpyLocked = true;
-    scrollSpyTargetId = id;
-    setTocActive(id);
-    if (scrollSpyLockTimer) { clearTimeout(scrollSpyLockTimer); }
-    scrollSpyLockTimer = setTimeout(releaseScrollSpyLock, 1200);
-  });
-
   var scrollSpyTick = false;
   function scheduleScrollSpy() {
     if (scrollSpyTick) { return; }
@@ -1654,9 +1643,6 @@
   }
   window.addEventListener("scroll", scheduleScrollSpy, { passive: true });
   window.addEventListener("resize", scheduleScrollSpy);
-  window.addEventListener("scrollend", function () {
-    if (scrollSpyLocked) { releaseScrollSpyLock(); }
-  });
 
   /* ---------- mermaid ---------- */
   function mermaidConfig() {
